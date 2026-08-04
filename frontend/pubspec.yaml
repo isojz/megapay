@@ -5,6 +5,7 @@ version: 0.1.0
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.35.0" # DropdownButtonFormField.initialValue 等の新 API を使用
 
 dependencies:
   flutter:

@@ -43,13 +43,21 @@ graph LR
 
 ## セットアップ
 
-### 0. 前提
+### 0. 前提（必要なツールとバージョン）
 
-- [Python 3.12+](https://www.python.org/)
-- [Flutter SDK](https://docs.flutter.dev/get-started/install)（stable チャンネル）
-- Supabase アカウント（無料プランで可）
+| ツール | バージョン | 備考 |
+| --- | --- | --- |
+| [Python](https://www.python.org/) | **3.12 以上**（3.12 / 3.13 で動作確認） | CI・本番（Render）は 3.12 |
+| [Flutter SDK](https://docs.flutter.dev/get-started/install) | **3.35 以上**（3.44.8 で動作確認） | stable チャンネル。[pubspec.yaml](frontend/pubspec.yaml) で強制 |
+| Supabase アカウント | - | 無料プランで可（チーム参加者は不要） |
+
+ライブラリのバージョンは [backend/requirements.txt](backend/requirements.txt)（Python）と
+[frontend/pubspec.yaml](frontend/pubspec.yaml) / `pubspec.lock`（Dart）で管理する。
 
 ### 1. Supabase プロジェクトの準備
+
+> **チーム参加者はこの手順は不要です**（開発用プロジェクトの接続情報はリポジトリに設定済み）。
+> 新しく Supabase プロジェクトを立てる場合のみ実施してください。
 
 1. [supabase.com](https://supabase.com/) で新規プロジェクトを作成する
 2. Dashboard > **SQL Editor** に [supabase/migrations/20260804000000_initial_schema.sql](supabase/migrations/20260804000000_initial_schema.sql) の内容を貼り付けて実行する
@@ -71,10 +79,11 @@ python -m venv .venv
 # Windows: .venv\Scripts\activate / macOS・Linux: source .venv/bin/activate
 .venv\Scripts\activate
 pip install -r requirements-dev.txt
-copy .env.example .env   # macOS・Linux: cp .env.example .env
-# → .env に Supabase の値を設定する
 uvicorn app.main:app --reload --port 8000
 ```
+
+開発用の Supabase 接続先は [app/config.py](backend/app/config.py) にデフォルト値として埋め込み済みのため、
+**`.env` なしでそのまま起動できる**。別プロジェクトや本番に向ける場合のみ `.env` で上書きする（[.env.example](backend/.env.example) 参照）。
 
 - 動作確認: <http://localhost:8000/health> → `{"status":"ok"}`
 - API ドキュメント（Swagger UI）: <http://localhost:8000/docs>
@@ -84,21 +93,16 @@ uvicorn app.main:app --reload --port 8000
 ```bash
 cd frontend
 flutter pub get
-flutter run -d chrome --web-port 3000 --dart-define=SUPABASE_URL=https://xxxx.supabase.co --dart-define=SUPABASE_ANON_KEY=eyJhbGciOi... --dart-define=API_BASE_URL=http://localhost:8000
+flutter run -d chrome
 ```
 
-`backend/.env` の値を流用して起動する開発用スクリプトも使えます：
+**OS を問わずこれだけで起動する。** 開発用の Supabase 接続先は [lib/config.dart](frontend/lib/config.dart) に
+デフォルト値として埋め込み済み（anon キーは RLS 前提の公開可能キーのため同梱している。秘密キーは含まない）。
+
+別プロジェクトや本番向けには `--dart-define` で上書きする：
 
 ```bash
-# macOS / Linux
-cd frontend
-./run_dev.sh
-```
-
-```powershell
-# Windows（実行ポリシーで弾かれる場合は powershell -ExecutionPolicy Bypass -File .\run_dev.ps1）
-cd frontend
-.\run_dev.ps1
+flutter run -d chrome --dart-define=SUPABASE_URL=https://xxxx.supabase.co --dart-define=SUPABASE_ANON_KEY=eyJhbGciOi...
 ```
 
 ### 4. 動作確認（デモシナリオ）
