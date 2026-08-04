@@ -73,14 +73,26 @@ graph LR
 
 ### 2. バックエンド（FastAPI）
 
-```bash
+Windows（PowerShell）:
+
+```powershell
 cd backend
 python -m venv .venv
-# Windows: .venv\Scripts\activate / macOS・Linux: source .venv/bin/activate
-.venv\Scripts\activate
-pip install -r requirements-dev.txt
-uvicorn app.main:app --reload --port 8000
+.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
 ```
+
+macOS / Linux:
+
+```bash
+cd backend
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/uvicorn app.main:app --reload --port 8000
+```
+
+※ venv の activate は不要（activate は Windows の実行ポリシーに引っかかりやすいため、
+venv 内の実行ファイルを直接呼ぶ方式にしている）。2回目以降の起動は最後の1行だけでよい。
 
 開発用の Supabase 接続先は [app/config.py](backend/app/config.py) にデフォルト値として埋め込み済みのため、
 **`.env` なしでそのまま起動できる**。別プロジェクトや本番に向ける場合のみ `.env` で上書きする（[.env.example](backend/.env.example) 参照）。
