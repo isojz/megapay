@@ -87,9 +87,16 @@ flutter pub get
 flutter run -d chrome --web-port 3000 --dart-define=SUPABASE_URL=https://xxxx.supabase.co --dart-define=SUPABASE_ANON_KEY=eyJhbGciOi... --dart-define=API_BASE_URL=http://localhost:8000
 ```
 
-Windows の場合は、`backend/.env` の値を流用して起動する開発用スクリプトも使えます：
+`backend/.env` の値を流用して起動する開発用スクリプトも使えます：
 
 ```bash
+# macOS / Linux
+cd frontend
+./run_dev.sh
+```
+
+```powershell
+# Windows（実行ポリシーで弾かれる場合は powershell -ExecutionPolicy Bypass -File .\run_dev.ps1）
 cd frontend
 .\run_dev.ps1
 ```
