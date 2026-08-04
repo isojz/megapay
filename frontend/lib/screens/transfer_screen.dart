@@ -229,7 +229,7 @@ class _TransferScreenState extends State<TransferScreen> {
                   Text('金額', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: _currency,
+                    initialValue: _currency,
                     decoration: const InputDecoration(
                       labelText: '通貨',
                       border: OutlineInputBorder(),

@@ -15,7 +15,8 @@ Future<void> main() async {
 
   await Supabase.initialize(
     url: AppConfig.supabaseUrl,
-    anonKey: AppConfig.supabaseAnonKey,
+    // レガシー anon キー / 新方式 publishable キーのどちらでも動く
+    publishableKey: AppConfig.supabaseAnonKey,
   );
   runApp(const MegaPayApp());
 }
@@ -62,18 +63,18 @@ class ConfigErrorApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       title: 'MegaPay - 設定エラー',
       home: Scaffold(
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.settings_suggest, size: 48),
-                const SizedBox(height: 16),
-                const Text(
+                Icon(Icons.settings_suggest, size: 48),
+                SizedBox(height: 16),
+                Text(
                   'Supabase の接続設定がありません。\n'
                   '--dart-define=SUPABASE_URL=... と\n'
                   '--dart-define=SUPABASE_ANON_KEY=... を付けて起動してください。\n'
