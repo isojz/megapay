@@ -115,7 +115,7 @@ DB 関数の `INSUFFICIENT_FUNDS` 等のエラーキーワードは `backend/app
 
 | 項目 | MVP | 今後 |
 | --- | --- | --- |
-| 認証 | Supabase Auth（JWT / HS256 検証） | 2FA・生体認証・JWT 非対称鍵化 |
+| 認証 | Supabase Auth（JWT を JWKS 公開鍵で検証。ES256/RS256/HS256 対応） | 2FA・生体認証 |
 | 認可 | RLS + SECURITY DEFINER 関数のみ書き込み可 | 監査ログ・異常検知 |
 | 金額精度 | numeric / Decimal / 文字列受け渡し | - |
 | 通信 | 本番 HTTPS 前提・CORS 制限 | レートリミット・WAF |

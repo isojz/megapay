@@ -46,6 +46,14 @@ def test_me_requires_auth():
         assert test_client.get("/api/v1/me").status_code == 401
 
 
+def test_me_rejects_garbage_token():
+    with TestClient(app) as test_client:
+        res = test_client.get(
+            "/api/v1/me", headers={"Authorization": "Bearer not-a-valid-jwt"}
+        )
+    assert res.status_code == 401
+
+
 def test_me_returns_profile(client, monkeypatch):
     monkeypatch.setattr(
         db,

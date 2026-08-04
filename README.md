@@ -56,10 +56,12 @@ graph LR
    （Supabase CLI 利用者は `supabase link` 後に `supabase db push` でも可）
 3. **メール確認をオフにする（デモ用）**: Dashboard > Authentication > Sign In / Providers > Email > 「Confirm email」を OFF にする
    ※ ON のままだとサインアップ直後にログインできません。本番では ON に戻します
-4. Dashboard > Settings > API から以下を控える
-   - Project URL（`SUPABASE_URL`）
-   - anon public キー（`SUPABASE_ANON_KEY`）
-   - JWT Secret（`SUPABASE_JWT_SECRET`。JWT Settings 内）
+4. Dashboard > Settings から以下を控える
+   - Project URL（`SUPABASE_URL`。Settings > Data API 内）
+   - anon public キー（`SUPABASE_ANON_KEY`。Settings > API Keys > 「Legacy anon, service_role API keys」タブ）
+
+   ※ JWT の検証は JWKS（公開鍵）で自動的に行うため、JWT Secret のコピーは不要です
+   （レガシー HS256 プロジェクトの場合のみ `SUPABASE_JWT_SECRET` を設定）
 
 ### 2. バックエンド（FastAPI）
 
@@ -83,6 +85,13 @@ uvicorn app.main:app --reload --port 8000
 cd frontend
 flutter pub get
 flutter run -d chrome --web-port 3000 --dart-define=SUPABASE_URL=https://xxxx.supabase.co --dart-define=SUPABASE_ANON_KEY=eyJhbGciOi... --dart-define=API_BASE_URL=http://localhost:8000
+```
+
+Windows の場合は、`backend/.env` の値を流用して起動する開発用スクリプトも使えます：
+
+```bash
+cd frontend
+.\run_dev.ps1
 ```
 
 ### 4. 動作確認（デモシナリオ）
