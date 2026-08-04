@@ -1,4 +1,4 @@
-# backend/.env の Supabase 接続情報を流用して Flutter Web を開発モードで起動する
+﻿# backend/.env の Supabase 接続情報を流用して Flutter Web を開発モードで起動する
 # 使い方: frontend ディレクトリで .\run_dev.ps1
 
 $envFile = Join-Path $PSScriptRoot "..\backend\.env"
