@@ -1,0 +1,48 @@
+# Render Blueprint - MegaPay を Render 上に一括デプロイする定義
+#
+# 使い方:
+#   1. https://render.com にサインアップ（GitHub アカウント連携）
+#   2. Dashboard > New > Blueprint > このリポジトリ (isojz/megapay) を選択
+#   3. 環境変数（sync: false のもの）を入力して Apply
+#      - SUPABASE_URL / SUPABASE_ANON_KEY: Supabase Dashboard > Settings 参照（README 参照）
+#   4. 数分待つと以下の URL が発行される
+#      - フロントエンド: https://megapay-web.onrender.com
+#      - バックエンド:   https://megapay-api.onrender.com
+#
+# 注意: 無料プランのバックエンドは 15 分アクセスがないとスリープし、
+#       次のアクセスで起動に 1 分ほどかかる（デモ用途では許容範囲）
+
+services:
+  # ---------- バックエンド (FastAPI) ----------
+  - type: web
+    name: megapay-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.6
+      - key: SUPABASE_URL
+        sync: false # Apply 時に入力
+      - key: SUPABASE_ANON_KEY
+        sync: false # Apply 時に入力
+      - key: CORS_ORIGINS
+        value: https://megapay-web.onrender.com
+
+  # ---------- フロントエンド (Flutter Web / 静的サイト) ----------
+  - type: web
+    name: megapay-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: |
+      git clone --depth 1 -b stable https://github.com/flutter/flutter.git $XDG_CACHE_HOME/flutter || true
+      $XDG_CACHE_HOME/flutter/bin/flutter build web --release --dart-define=SUPABASE_URL=$SUPABASE_URL --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY --dart-define=API_BASE_URL=https://megapay-api.onrender.com
+    staticPublishPath: build/web
+    envVars:
+      - key: SUPABASE_URL
+        sync: false # Apply 時に入力（バックエンドと同じ値）
+      - key: SUPABASE_ANON_KEY
+        sync: false # Apply 時に入力（バックエンドと同じ値）

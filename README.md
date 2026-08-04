@@ -113,13 +113,22 @@ CI（GitHub Actions）では push / PR ごとにバックエンドのテスト�
 
 ## デプロイ（MVP 想定）
 
+リポジトリ直下の [render.yaml](render.yaml)（Render Blueprint）で、フロントエンド・バックエンドを一括デプロイできます：
+
+1. [render.com](https://render.com) に GitHub アカウントでサインアップ
+2. Dashboard > **New > Blueprint** > `megapay` リポジトリを選択
+3. 求められた環境変数（`SUPABASE_URL` / `SUPABASE_ANON_KEY`）を入力して **Apply**
+4. 発行された URL（フロント: `megapay-web.onrender.com`）をチームに共有
+
+その他の構成（Vercel / Cloudflare Pages + Railway 等)でも可：
+
 | 対象 | 方法 |
 | --- | --- |
-| フロントエンド | `flutter build web` → `frontend/build/web` を Vercel / Cloudflare Pages / Netlify 等に配置（`--dart-define` を本番値でビルド） |
-| バックエンド | Render / Railway / Fly.io 等で `uvicorn app.main:app --host 0.0.0.0 --port $PORT` を起動し、`.env` 相当の環境変数を設定 |
+| フロントエンド | `flutter build web` → `frontend/build/web` を静的ホスティングに配置（`--dart-define` を本番値でビルド） |
+| バックエンド | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` を起動し、`.env` 相当の環境変数を設定 |
 | DB / 認証 | Supabase（マイグレーション適用済みプロジェクト） |
 
-本番では `CORS_ORIGINS` をフロントエンドの公開 URL に必ず絞ってください。
+本番では `CORS_ORIGINS` をフロントエンドの公開 URL に必ず絞ってください（render.yaml では設定済み）。
 
 ## リポジトリ構成
 
