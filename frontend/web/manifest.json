@@ -1,0 +1,10 @@
+{
+  "name": "MegaPay",
+  "short_name": "MegaPay",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0D47A1",
+  "theme_color": "#0D47A1",
+  "description": "手軽に送金できるスマホアプリ（MVP）",
+  "icons": []
+}

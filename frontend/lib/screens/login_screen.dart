@@ -1,0 +1,167 @@
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+/// ログイン / 口座開設（サインアップ）画面。
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _displayNameController = TextEditingController();
+  bool _isSignUp = false;
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _displayNameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    setState(() => _isLoading = true);
+
+    final auth = Supabase.instance.client.auth;
+    try {
+      if (_isSignUp) {
+        await auth.signUp(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          data: {'display_name': _displayNameController.text.trim()},
+        );
+      } else {
+        await auth.signInWithPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
+      }
+      // 成功時は AuthGate が自動的にホーム画面へ切り替える
+    } on AuthException catch (err) {
+      _showError(err.message);
+    } catch (_) {
+      _showError('通信に失敗しました。時間をおいて再度お試しください。');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.error,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Icon(Icons.currency_exchange,
+                      size: 64, color: Color(0xFF0D47A1)),
+                  const SizedBox(height: 8),
+                  Text(
+                    'MegaPay',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context)
+                        .textTheme
+                        .headlineMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    '手軽に、どの通貨でも送金',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 32),
+                  if (_isSignUp) ...[
+                    TextFormField(
+                      controller: _displayNameController,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'お名前（表示名）',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) => (value == null || value.trim().isEmpty)
+                          ? 'お名前を入力してください'
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  TextFormField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'メールアドレス',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) => (value == null || !value.contains('@'))
+                        ? 'メールアドレスを入力してください'
+                        : null,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'パスワード（6文字以上）',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) => (value == null || value.length < 6)
+                        ? 'パスワードは6文字以上で入力してください'
+                        : null,
+                    onFieldSubmitted: (_) => _submit(),
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    onPressed: _isLoading ? null : _submit,
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(_isSignUp ? '口座を開設する（無料）' : 'ログイン'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: _isLoading
+                        ? null
+                        : () => setState(() => _isSignUp = !_isSignUp),
+                    child: Text(_isSignUp
+                        ? 'アカウントをお持ちの方はログイン'
+                        : '初めての方は口座開設（サインアップ）'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

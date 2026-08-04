@@ -1,0 +1,340 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../models/models.dart';
+import '../services/api_client.dart';
+import '../utils/money.dart';
+import 'transfer_screen.dart';
+
+class _HomeData {
+  const _HomeData(this.profile, this.balances, this.transfers);
+
+  final Profile profile;
+  final List<Balance> balances;
+  final List<TransferRecord> transfers;
+}
+
+/// ホーム画面：プロフィール（ユーザーID）・残高一覧・送金履歴を表示する。
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  late Future<_HomeData> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  Future<_HomeData> _load() async {
+    final api = ApiClient.instance;
+    final results = await Future.wait([
+      api.fetchProfile(),
+      api.fetchBalances(),
+      api.fetchTransfers(),
+    ]);
+    return _HomeData(
+      results[0] as Profile,
+      results[1] as List<Balance>,
+      results[2] as List<TransferRecord>,
+    );
+  }
+
+  Future<void> _reload() {
+    final future = _load();
+    if (mounted) {
+      setState(() => _future = future);
+    }
+    // エラーは FutureBuilder 側で表示するためここでは握りつぶす
+    return future.then((_) {}, onError: (_) {});
+  }
+
+  Future<void> _openTransferScreen(List<Balance> balances) async {
+    final sent = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => TransferScreen(balances: balances)),
+    );
+    if (sent == true && mounted) {
+      await _reload();
+    }
+  }
+
+  Future<void> _signOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('ログアウト'),
+        content: const Text('ログアウトしますか？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('ログアウト'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await Supabase.instance.client.auth.signOut();
+      // 画面遷移は AuthGate が行う
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('MegaPay'),
+        actions: [
+          IconButton(
+            tooltip: 'ログアウト',
+            icon: const Icon(Icons.logout),
+            onPressed: _signOut,
+          ),
+        ],
+      ),
+      body: FutureBuilder<_HomeData>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return _ErrorView(
+              message: snapshot.error.toString(),
+              onRetry: _reload,
+            );
+          }
+          final data = snapshot.data!;
+          return RefreshIndicator(
+            onRefresh: _reload,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+                  children: [
+                    _ProfileCard(profile: data.profile),
+                    const SizedBox(height: 24),
+                    Text('残高', style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    ...data.balances.map((b) => _BalanceTile(balance: b)),
+                    if (data.balances.isEmpty)
+                      const Card(
+                        child: ListTile(title: Text('残高がありません')),
+                      ),
+                    const SizedBox(height: 24),
+                    Text('履歴', style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    if (data.transfers.isEmpty)
+                      const Card(
+                        child: ListTile(title: Text('まだ送金履歴がありません')),
+                      ),
+                    ...data.transfers.map((t) => _TransferTile(record: t)),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+      floatingActionButton: FutureBuilder<_HomeData>(
+        future: _future,
+        builder: (context, snapshot) {
+          final balances = snapshot.data?.balances ?? const <Balance>[];
+          return FloatingActionButton.extended(
+            onPressed:
+                snapshot.hasData ? () => _openTransferScreen(balances) : null,
+            icon: const Icon(Icons.send),
+            label: const Text('送金する'),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ProfileCard extends StatelessWidget {
+  const _ProfileCard({required this.profile});
+
+  final Profile profile;
+
+  Future<void> _copyUserId(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await Clipboard.setData(ClipboardData(text: profile.userId));
+    messenger.showSnackBar(
+      const SnackBar(content: Text('ユーザーIDをコピーしました')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      color: theme.colorScheme.primaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  child: Text(
+                    profile.displayName.isNotEmpty
+                        ? profile.displayName.characters.first
+                        : '?',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${profile.displayName} さん',
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      Text(profile.email, style: theme.textTheme.bodySmall),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'ユーザーID: ${profile.userId}',
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontFamily: 'monospace'),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'ユーザーIDをコピー',
+                  icon: const Icon(Icons.copy, size: 18),
+                  onPressed: () => _copyUserId(context),
+                ),
+              ],
+            ),
+            Text(
+              'このIDを相手に伝えると送金を受け取れます',
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BalanceTile extends StatelessWidget {
+  const _BalanceTile({required this.balance});
+
+  final Balance balance;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+          child: Text(
+            balance.currency.substring(0, 1),
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        title: Text(balance.currency),
+        trailing: Text(
+          formatMoney(balance.currency, balance.amount),
+          style: Theme.of(context)
+              .textTheme
+              .titleMedium
+              ?.copyWith(fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+}
+
+class _TransferTile extends StatelessWidget {
+  const _TransferTile({required this.record});
+
+  final TransferRecord record;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final sent = record.isSent;
+    final sign = sent ? '-' : '+';
+    final color = sent ? theme.colorScheme.onSurface : Colors.green.shade700;
+    return Card(
+      child: ListTile(
+        leading: Icon(
+          sent ? Icons.arrow_upward : Icons.arrow_downward,
+          color: sent ? theme.colorScheme.primary : Colors.green.shade700,
+        ),
+        title: Text(
+          sent
+              ? '${record.counterpartName} さんへ送金'
+              : '${record.counterpartName} さんから受取',
+        ),
+        subtitle: Text(
+          [
+            record.counterpartUserId,
+            formatDateTime(record.createdAt),
+            if (record.memo != null && record.memo!.isNotEmpty)
+              'メモ: ${record.memo}',
+          ].join('\n'),
+        ),
+        isThreeLine: true,
+        trailing: Text(
+          '$sign${formatMoney(record.currency, record.amount)}',
+          style: theme.textTheme.titleSmall
+              ?.copyWith(fontWeight: FontWeight.bold, color: color),
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message, required this.onRetry});
+
+  final String message;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, size: 48),
+            const SizedBox(height: 12),
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('再読み込み'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
