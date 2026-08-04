@@ -43,6 +43,29 @@ graph LR
 
 ## セットアップ
 
+### ⚡ 起動早見表
+
+**毎回の起動（セットアップ済みの人）** — ターミナルを2つ開く：
+
+```powershell
+# ① バックエンド（Windows）
+cd megapay\backend; .venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
+```
+
+```bash
+# ① バックエンド（macOS / Linux）
+cd megapay/backend && .venv/bin/uvicorn app.main:app --reload --port 8000
+```
+
+```bash
+# ② フロントエンド（全 OS 共通）
+cd megapay/frontend && flutter run -d chrome
+```
+
+- ② が Chrome を自動で開き、そこがアプリ画面（バックエンドを先に起動しておくこと）
+- OS の違いは①の venv パス表記だけ。**コマンドは必ず表記どおりのフォルダ内で実行する**
+- **初回のみ**、下の「2. バックエンド」「3. フロントエンド」のセットアップ（依存インストール）を先に 1 度だけ行う
+
 ### 0. 前提（必要なツールとバージョン）
 
 | ツール | バージョン | 備考 |
