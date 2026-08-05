@@ -47,6 +47,9 @@ erDiagram
     profiles ||--o{ transfers : "送金/受取"
     profiles ||--o{ payment_requests : "請求した/された"
     transfers ||--o| payment_requests : "支払い成立時に紐づく"
+    profiles ||--o{ split_bills : "集金する"
+    split_bills ||--o{ split_bill_participants : "参加者"
+    payment_requests ||--|| split_bill_participants : "参加時に発行される請求"
 
     profiles {
         uuid id PK "auth.users.id"
@@ -83,6 +86,24 @@ erDiagram
         timestamptz created_at
         timestamptz paid_at
         timestamptz cancelled_at
+    }
+    split_bills {
+        uuid id PK
+        text bill_code UK "参加用コード SP-XXXXXXXX"
+        uuid organizer_id FK "集金者"
+        text title "イベント名"
+        text currency
+        numeric total_amount "合計金額"
+        int participant_count "集金者を含む人数"
+        numeric share_amount "1人あたり（端数切り上げ）"
+        timestamptz created_at
+    }
+    split_bill_participants {
+        uuid id PK
+        uuid split_bill_id FK
+        uuid participant_id FK "支払い者"
+        uuid payment_request_id FK "参加時に発行された請求"
+        timestamptz joined_at
     }
 ```
 
@@ -142,6 +163,40 @@ sequenceDiagram
 どちらも共通の `internal_move_funds` を呼ぶ。資金移動のロジックが 1 箇所にまとまるため、
 残高チェック・ロック順序・履歴記録の扱いが両者でずれない。
 
+## 割り勘シーケンス
+
+```mermaid
+sequenceDiagram
+    participant O as 集金者（太郎）
+    participant P as 支払い者（花子）
+    participant A as FastAPI
+    participant D as Supabase PostgreSQL
+
+    O->>A: POST /split-bills（イベント名・人数・合計金額）
+    A->>D: rpc create_split_bill
+    Note over D: 1人あたり = 合計 ÷ 人数（端数は切り上げ）
+    D-->>A: 請求コード SP-XXXXXXXX
+    A-->>O: 201 Created
+    O-->>P: 請求コードを伝える
+
+    P->>A: POST /split-bills/SP-XXXXXXXX/join
+    A->>D: rpc join_split_bill
+    Note over D: 1トランザクション<br/>割り勘を行ロック（定員超過を防ぐ）<br/>→ 参加者を登録<br/>→ 集金者→参加者の請求を自動発行
+    D-->>A: 参加後の状態（自分あての請求コード RQ-XXXXXXXX）
+    A-->>P: 200 OK
+
+    P->>A: POST /payment-requests/RQ-XXXXXXXX/pay
+    Note over A,D: 支払いは既存の請求機能をそのまま利用
+    A-->>P: 200 OK（送金が実行される）
+
+    O->>A: GET /split-bills/SP-XXXXXXXX/participants
+    A-->>O: 誰が支払い済みか / 未払いかの一覧
+```
+
+割り勘は「1つのイベントに対して、参加者ごとに 1 件の請求を作る」構造にしている。
+支払い・残高の移動は既存の請求機能（`pay_payment_request` → `internal_move_funds`）を
+そのまま通るため、資金移動のロジックは 1 箇所のままになっている。
+
 ## API 仕様（v1）
 
 すべて `Authorization: Bearer <Supabase アクセストークン>` が必要（`/health` を除く）。
@@ -160,6 +215,11 @@ sequenceDiagram
 | GET | `/api/v1/payment-requests/{code}` | 請求コードから内容取得（支払い前の確認） | 404 コードなし・当事者以外 |
 | POST | `/api/v1/payment-requests/{code}/pay` | 請求コードを指定して支払う | 400 残高不足 / 404 コードなし / 409 支払い済み・取り消し済み |
 | POST | `/api/v1/payment-requests/{code}/cancel` | 請求を取り消す（請求者・未払いのみ） | 404 コードなし / 409 支払い済み |
+| POST | `/api/v1/split-bills` | 割り勘を登録 `{title, currency, total_amount, participant_count}` → 請求コード発行 | 400 入力不正 / 422 入力不正 |
+| GET | `/api/v1/split-bills?limit=50` | 自分が関わる割り勘の一覧 | 401 |
+| GET | `/api/v1/split-bills/{code}` | 請求コードから割り勘の内容を取得（参加前の確認） | 404 コードなし |
+| POST | `/api/v1/split-bills/{code}/join` | グループに参加（同時に自分あての請求が発行される） | 400 集金者本人 / 404 コードなし / 409 定員超過 |
+| GET | `/api/v1/split-bills/{code}/participants` | 参加者と支払い状況の一覧 | 404 コードなし・部外者 |
 | GET | `/api/v1/saved-users` | 保存済みユーザー一覧 | 401 |
 | POST | `/api/v1/saved-users` | ユーザーを保存 `{user_id}` | 400 自分自身 / 404 宛先なし / 422 入力不正 |
 

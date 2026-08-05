@@ -6,6 +6,7 @@ import '../models/models.dart';
 import '../services/api_client.dart';
 import '../utils/money.dart';
 import '../widgets/payment_request_actions.dart';
+import '../widgets/split_bill_actions.dart';
 import 'saved_users_screen.dart';
 import 'transfer_screen.dart';
 
@@ -155,6 +156,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       onTransfer: () => _openTransferScreen(data.balances),
                       onSavedUsers: () => _openSavedUsers(data.balances),
                     ),
+                    const SizedBox(height: 12),
+                    SplitBillActions(onChanged: _reload),
                     const SizedBox(height: 24),
                     Text('残高', style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 8),
