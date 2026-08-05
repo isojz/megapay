@@ -53,6 +53,7 @@ class SplitBillParticipant(BaseModel):
     request_code: str
     amount: str
     status: str  # "pending"（未払い） / "paid"（支払い済み）
+    payment_method: str = "balance"  # "balance"（残高から送金） / "cash"（現金で受け渡し）
     paid_at: datetime | None = None
     is_me: bool
     joined_at: datetime

@@ -98,6 +98,7 @@ class SplitBillParticipant {
     required this.status,
     required this.isMe,
     required this.joinedAt,
+    this.paymentMethod = 'balance',
     this.paidAt,
   });
 
@@ -106,12 +107,17 @@ class SplitBillParticipant {
   final String requestCode;
   final String amount;
   final String status; // "pending"（未払い） / "paid"（支払い済み）
+
+  /// "balance"（残高から送金） / "cash"（現金で受け渡し）
+  final String paymentMethod;
+
   final DateTime? paidAt;
   final bool isMe;
   final DateTime joinedAt;
 
   bool get isPaid => status == 'paid';
-  String get statusLabel => isPaid ? '支払い済み' : '未払い';
+  bool get isPaidByCash => isPaid && paymentMethod == 'cash';
+  String get statusLabel => isPaid ? (isPaidByCash ? '現金で受取済み' : '支払い済み') : '未払い';
 
   factory SplitBillParticipant.fromJson(Map<String, dynamic> json) =>
       SplitBillParticipant(
@@ -120,6 +126,7 @@ class SplitBillParticipant {
         requestCode: json['request_code'] as String,
         amount: json['amount'] as String,
         status: json['status'] as String,
+        paymentMethod: json['payment_method'] as String? ?? 'balance',
         paidAt: json['paid_at'] == null
             ? null
             : DateTime.parse(json['paid_at'] as String).toLocal(),

@@ -7,7 +7,8 @@ enum PaymentMethod {
   mastercard('Mastercard', Icons.credit_card, true),
   jcb('JCB', Icons.credit_card, true),
   amex('American Express', Icons.credit_card, true),
-  cash('現金で支払った', Icons.payments_outlined, true);
+  // 現金は「その場で渡した記録」を実際に残せるためモックではない
+  cash('現金で支払った', Icons.payments_outlined, false);
 
   const PaymentMethod(this.label, this.icon, this.isMock);
 

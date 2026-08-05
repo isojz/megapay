@@ -35,6 +35,7 @@ def _request_json(**overrides) -> dict:
         "amount": "3000",
         "memo": "飲み会代",
         "status": "pending",
+        "payment_method": "balance",
         "created_at": "2026-08-05T09:00:00+00:00",
         "paid_at": None,
         "cancelled_at": None,
@@ -174,6 +175,50 @@ def test_pay_request_maps_db_errors(client, monkeypatch, db_message, expected_st
 
     monkeypatch.setattr(db, "pay_request", fake_pay)
     assert client.post(f"{BASE}/RQ-ABCD2345/pay").status_code == expected_status
+
+
+def test_pay_request_by_cash(client, monkeypatch):
+    captured = {}
+
+    def fake_pay_cash(token, code):
+        captured["code"] = code
+        return _request_json(
+            status="paid",
+            payment_method="cash",
+            direction="billed",
+            paid_at="2026-08-05T10:00:00+00:00",
+        )
+
+    monkeypatch.setattr(db, "pay_request_by_cash", fake_pay_cash)
+    res = client.post(f"{BASE}/RQ-ABCD2345/pay-cash")
+    assert res.status_code == 200
+    assert captured["code"] == "RQ-ABCD2345"
+    body = res.json()
+    assert body["status"] == "paid"
+    # 現金払いは残高を動かさず、支払い方法として記録される
+    assert body["payment_method"] == "cash"
+    assert body["paid_at"] is not None
+
+
+@pytest.mark.parametrize(
+    ("db_message", "expected_status"),
+    [
+        ("REQUEST_ALREADY_PAID", 409),
+        ("REQUEST_CANCELLED", 409),
+        ("REQUEST_NOT_FOUND", 404),
+    ],
+)
+def test_pay_by_cash_maps_db_errors(client, monkeypatch, db_message, expected_status):
+    def fake_pay_cash(*args, **kwargs):
+        raise _api_error(db_message)
+
+    monkeypatch.setattr(db, "pay_request_by_cash", fake_pay_cash)
+    assert client.post(f"{BASE}/RQ-ABCD2345/pay-cash").status_code == expected_status
+
+
+def test_pay_by_cash_requires_auth():
+    with TestClient(app) as test_client:
+        assert test_client.post(f"{BASE}/RQ-ABCD2345/pay-cash").status_code == 401
 
 
 def test_cancel_request(client, monkeypatch):

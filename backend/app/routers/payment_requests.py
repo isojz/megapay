@@ -67,6 +67,22 @@ def pay_payment_request(
     return PaymentRequestResponse(**data)
 
 
+@router.post("/{request_code}/pay-cash", response_model=PaymentRequestResponse)
+def pay_payment_request_by_cash(
+    request_code: str,
+    user: AuthUser = Depends(get_current_user),
+) -> PaymentRequestResponse:
+    """現金で支払ったことを記録する。
+
+    その場で現金を渡す割り勘向け。残高・送金履歴は変更せず、支払い済みとしてのみ記録する。
+    """
+    try:
+        data = db.pay_request_by_cash(user.token, request_code.strip())
+    except APIError as err:
+        raise to_http_exception(err) from err
+    return PaymentRequestResponse(**data)
+
+
 @router.post("/{request_code}/cancel", response_model=PaymentRequestResponse)
 def cancel_payment_request(
     request_code: str,

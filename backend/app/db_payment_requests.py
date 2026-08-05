@@ -44,6 +44,12 @@ def pay_request(token: str, code: str) -> dict[str, Any]:
     return res.data
 
 
+def pay_request_by_cash(token: str, code: str) -> dict[str, Any]:
+    """現金で支払ったことを記録する（残高・送金履歴は変更されない）。"""
+    res = _client(token).rpc("pay_payment_request_by_cash", {"p_code": code}).execute()
+    return res.data
+
+
 def cancel_request(token: str, code: str) -> dict[str, Any]:
     res = _client(token).rpc("cancel_payment_request", {"p_code": code}).execute()
     return res.data
