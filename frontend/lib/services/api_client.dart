@@ -129,6 +129,15 @@ class ApiClient {
         ) as Map<String, dynamic>,
       );
 
+  /// 現金で支払ったことを記録する（残高・送金履歴は変更されない）
+  Future<PaymentRequest> payPaymentRequestByCash(String requestCode) async =>
+      PaymentRequest.fromJson(
+        await _post(
+          '/api/v1/payment-requests/${Uri.encodeComponent(requestCode)}/pay-cash',
+          const {},
+        ) as Map<String, dynamic>,
+      );
+
   /// 請求を取り消す（請求した本人・未払いのもののみ）
   Future<PaymentRequest> cancelPaymentRequest(String requestCode) async =>
       PaymentRequest.fromJson(

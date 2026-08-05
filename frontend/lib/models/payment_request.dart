@@ -14,6 +14,7 @@ class PaymentRequest {
     required this.amount,
     required this.status,
     required this.createdAt,
+    this.paymentMethod = 'balance',
     this.memo,
     this.paidAt,
     this.cancelledAt,
@@ -36,6 +37,9 @@ class PaymentRequest {
   /// "pending"（未払い） / "paid"（支払い済み） / "cancelled"（取り消し済み）
   final String status;
 
+  /// "balance"（残高から送金） / "cash"（現金で受け渡し）
+  final String paymentMethod;
+
   final DateTime createdAt;
   final DateTime? paidAt;
   final DateTime? cancelledAt;
@@ -43,6 +47,7 @@ class PaymentRequest {
   bool get isRequestedByMe => direction == 'requested';
   bool get isPending => status == 'pending';
   bool get isPaid => status == 'paid';
+  bool get isPaidByCash => paymentMethod == 'cash';
 
   /// 一覧やダイアログで表示する状態のラベル
   String get statusLabel => switch (status) {
@@ -66,6 +71,7 @@ class PaymentRequest {
         amount: json['amount'] as String,
         memo: json['memo'] as String?,
         status: json['status'] as String,
+        paymentMethod: json['payment_method'] as String? ?? 'balance',
         createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
         paidAt: json['paid_at'] == null
             ? null

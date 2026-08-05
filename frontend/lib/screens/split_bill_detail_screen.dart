@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../models/split_bill.dart';
 import '../services/api_client.dart';
 import '../utils/money.dart';
-import 'pay_request_screen.dart';
+import 'split_bill_payment_mock_screen.dart';
 
 class _DetailData {
   const _DetailData(this.bill, this.participants);
@@ -63,8 +63,11 @@ class _SplitBillDetailScreenState extends State<SplitBillDetailScreen> {
   Future<void> _pay(SplitBill bill) async {
     final code = bill.myRequestCode;
     if (code == null) return;
+    // 割り勘は現金でのやり取りもあるため、支払い方法を選べる画面へ進む
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => PayRequestScreen(initialCode: code)),
+      MaterialPageRoute(
+        builder: (_) => SplitBillPaymentMockScreen(requestCode: code),
+      ),
     );
     await _reload();
   }
@@ -310,7 +313,11 @@ class _ParticipantTile extends StatelessWidget {
               ? Colors.green.shade100
               : theme.colorScheme.surfaceContainerHighest,
           child: Icon(
-            paid ? Icons.check : Icons.schedule,
+            paid
+                ? (participant.isPaidByCash
+                    ? Icons.payments_outlined
+                    : Icons.check)
+                : Icons.schedule,
             color: paid ? Colors.green.shade800 : theme.colorScheme.outline,
           ),
         ),
@@ -320,7 +327,9 @@ class _ParticipantTile extends StatelessWidget {
         ),
         subtitle: Text(
           paid && participant.paidAt != null
-              ? '${participant.userId}\n${formatDateTime(participant.paidAt!)} に支払い'
+              ? '${participant.userId}\n'
+                  '${formatDateTime(participant.paidAt!)} に'
+                  '${participant.isPaidByCash ? '現金で' : ''}支払い'
               : participant.userId,
         ),
         isThreeLine: paid && participant.paidAt != null,

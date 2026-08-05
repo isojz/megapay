@@ -5,7 +5,7 @@ import '../services/api_client.dart';
 import '../utils/money.dart';
 import '../widgets/payment_request_tile.dart';
 import '../widgets/payment_method_selector.dart';
-import 'split_bill_payment_mock_screen.dart';
+import 'split_bill_list_screen.dart';
 
 /// 請求コードを入力して支払う画面。
 /// 一覧から開く場合は [initialCode] を渡すと自動で内容を取得する。
@@ -247,9 +247,11 @@ class _PayRequestScreenState extends State<PayRequestScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: OutlinedButton.icon(
+                      // 割り勘の支払いは請求コードごとに画面が変わるため、
+                      // ここからは一覧に進み、支払う割り勘を選んでもらう
                       onPressed: () => Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => const SplitBillPaymentMockScreen(),
+                          builder: (_) => const SplitBillListScreen(),
                         ),
                       ),
                       icon: const Icon(Icons.groups_outlined),
