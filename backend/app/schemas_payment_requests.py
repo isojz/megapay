@@ -35,6 +35,7 @@ class PaymentRequestResponse(BaseModel):
     amount: str
     memo: str | None = None
     status: str  # "pending" / "paid" / "cancelled"
+    payment_method: str = "balance"  # "balance"（残高から送金） / "cash"（現金で受け渡し）
     created_at: datetime
     paid_at: datetime | None = None
     cancelled_at: datetime | None = None

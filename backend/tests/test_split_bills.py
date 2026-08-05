@@ -53,6 +53,7 @@ def _participant_json(**overrides) -> dict:
         "request_code": "RQ-ZZZZ9999",
         "amount": "5000",
         "status": "pending",
+        "payment_method": "balance",
         "paid_at": None,
         "is_me": False,
         "joined_at": "2026-08-05T09:30:00+00:00",
@@ -240,6 +241,22 @@ def test_list_participants(client, monkeypatch):
     assert [p["status"] for p in body] == ["pending", "paid"]
     assert body[1]["is_me"] is True
     assert body[1]["paid_at"] is not None
+
+
+def test_list_participants_shows_payment_method(client, monkeypatch):
+    """集金者が「誰が現金で払ったか」を判別できること。"""
+    monkeypatch.setattr(
+        db,
+        "list_participants",
+        lambda token, code: [
+            _participant_json(status="paid", payment_method="cash"),
+            _participant_json(
+                user_id="MP-33334444", status="paid", payment_method="balance"
+            ),
+        ],
+    )
+    body = client.get(f"{BASE}/SP-ABCD2345/participants").json()
+    assert [p["payment_method"] for p in body] == ["cash", "balance"]
 
 
 def test_list_participants_of_other_group_is_404(client, monkeypatch):
