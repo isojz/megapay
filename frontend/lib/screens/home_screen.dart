@@ -6,11 +6,16 @@ import '../models/models.dart';
 import '../services/api_client.dart';
 import '../utils/money.dart';
 import '../widgets/payment_request_actions.dart';
+import '../widgets/transfer_tile.dart';
 import 'saved_users_screen.dart';
+import 'transfer_history_screen.dart';
 import 'transfer_screen.dart';
 
 /// 現在は日本円のみを扱う。デモ用に作られる USD / EUR の残高は表示しない。
 const _supportedCurrency = 'JPY';
+
+/// ホームに出す履歴の件数。これを超える分は履歴一覧画面で見る。
+const _recentTransferCount = 3;
 
 class _HomeData {
   const _HomeData(this.profile, this.balances, this.transfers);
@@ -77,6 +82,13 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute(builder: (_) => SavedUsersScreen(balances: balances)),
     );
     if (sent == true && mounted) await _reload();
+  }
+
+  Future<void> _openHistory() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const TransferHistoryScreen()),
+    );
+    await _reload();
   }
 
   Future<void> _saveCounterpart(TransferRecord record) async {
@@ -169,18 +181,29 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: ListTile(title: Text('残高がありません')),
                       ),
                     const SizedBox(height: 24),
-                    Text('履歴', style: Theme.of(context).textTheme.titleMedium),
+                    Text(
+                      '最近の履歴',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                     const SizedBox(height: 8),
                     if (data.transfers.isEmpty)
                       const Card(
                         child: ListTile(title: Text('まだ送金履歴がありません')),
                       ),
-                    ...data.transfers.map(
-                      (t) => _TransferTile(
-                        record: t,
-                        onSave: () => _saveCounterpart(t),
+                    ...data.transfers.take(_recentTransferCount).map(
+                          (t) => TransferTile(
+                            record: t,
+                            onSave: () => _saveCounterpart(t),
+                          ),
+                        ),
+                    if (data.transfers.length > _recentTransferCount) ...[
+                      const SizedBox(height: 4),
+                      OutlinedButton.icon(
+                        onPressed: _openHistory,
+                        icon: const Icon(Icons.history),
+                        label: Text('すべて見る（全 ${data.transfers.length} 件）'),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -291,63 +314,6 @@ class _BalanceTile extends StatelessWidget {
               .textTheme
               .titleMedium
               ?.copyWith(fontWeight: FontWeight.bold),
-        ),
-      ),
-    );
-  }
-}
-
-class _TransferTile extends StatelessWidget {
-  const _TransferTile({required this.record, required this.onSave});
-
-  final TransferRecord record;
-  final VoidCallback onSave;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final sent = record.isSent;
-    final sign = sent ? '-' : '+';
-    final color = sent ? theme.colorScheme.onSurface : Colors.green.shade700;
-    return Card(
-      child: ListTile(
-        leading: Icon(
-          sent ? Icons.arrow_upward : Icons.arrow_downward,
-          color: sent ? theme.colorScheme.primary : Colors.green.shade700,
-        ),
-        title: Text(
-          sent
-              ? '${record.counterpartName} さんへ送金'
-              : '${record.counterpartName} さんから受取',
-        ),
-        subtitle: Text(
-          [
-            record.counterpartUserId,
-            formatDateTime(record.createdAt),
-            if (record.memo != null && record.memo!.isNotEmpty)
-              'メモ: ${record.memo}',
-          ].join('\n'),
-        ),
-        isThreeLine: true,
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              '$sign${formatMoney(record.currency, record.amount)}',
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.bold, color: color),
-            ),
-            SizedBox(
-              height: 28,
-              child: IconButton(
-                padding: EdgeInsets.zero,
-                tooltip: 'ユーザーを保存',
-                onPressed: onSave,
-                icon: const Icon(Icons.bookmark_add_outlined, size: 20),
-              ),
-            ),
-          ],
         ),
       ),
     );
