@@ -45,6 +45,8 @@ erDiagram
     auth_users ||--|| profiles : "1:1（トリガーで自動作成）"
     profiles ||--o{ balances : "通貨ごとに1行"
     profiles ||--o{ transfers : "送金/受取"
+    profiles ||--o{ payment_requests : "請求した/された"
+    transfers ||--o| payment_requests : "支払い成立時に紐づく"
 
     profiles {
         uuid id PK "auth.users.id"
@@ -67,6 +69,20 @@ erDiagram
         numeric amount "0より大"
         text memo
         timestamptz created_at
+    }
+    payment_requests {
+        uuid id PK
+        text request_code UK "支払い用コード RQ-XXXXXXXX"
+        uuid requester_id FK "請求した人（受け取る側）"
+        uuid payer_id FK "請求された人（支払う側）"
+        text currency
+        numeric amount "0より大"
+        text memo
+        text status "pending/paid/cancelled"
+        uuid transfer_id FK "成立した送金"
+        timestamptz created_at
+        timestamptz paid_at
+        timestamptz cancelled_at
     }
 ```
 
@@ -94,6 +110,38 @@ sequenceDiagram
     F-->>U: 完了ダイアログ → 残高・履歴を再取得
 ```
 
+## 請求シーケンス
+
+```mermaid
+sequenceDiagram
+    participant R as 請求する人（太郎）
+    participant P as 請求される人（花子）
+    participant A as FastAPI
+    participant D as Supabase PostgreSQL
+
+    R->>A: POST /payment-requests（相手ID・通貨・金額）
+    A->>D: rpc create_payment_request
+    D-->>A: 請求コード RQ-XXXXXXXX
+    A-->>R: 201 Created（コードを画面に表示）
+    R-->>P: コードを口頭 / チャットなどで伝える
+
+    P->>A: GET /payment-requests/RQ-XXXXXXXX
+    A->>D: rpc find_payment_request
+    Note over D: 当事者以外には<br/>存在自体を知らせない
+    D-->>A: 請求内容
+    A-->>P: 金額・請求元を表示
+
+    P->>A: POST /payment-requests/RQ-XXXXXXXX/pay
+    A->>D: rpc pay_payment_request
+    Note over D: 1トランザクション<br/>請求を行ロック（二重支払い防止）<br/>→ internal_move_funds で資金移動<br/>→ status=paid・transfer_id 記録
+    D-->>A: 支払い済みの請求
+    A-->>P: 200 OK（完了ダイアログ）
+```
+
+送金（`execute_transfer`）と請求の支払い（`pay_payment_request`）は、
+どちらも共通の `internal_move_funds` を呼ぶ。資金移動のロジックが 1 箇所にまとまるため、
+残高チェック・ロック順序・履歴記録の扱いが両者でずれない。
+
 ## API 仕様（v1）
 
 すべて `Authorization: Bearer <Supabase アクセストークン>` が必要（`/health` を除く）。
@@ -107,6 +155,11 @@ sequenceDiagram
 | GET | `/api/v1/recipients/{user_id}` | 宛先確認（表示名の取得） | 404 宛先なし |
 | POST | `/api/v1/transfers` | 送金実行 `{recipient_user_id, currency, amount, memo?}` | 400 残高不足・自分宛て / 404 宛先なし / 422 入力不正 |
 | GET | `/api/v1/transfers?limit=50` | 送金・受取履歴（新しい順） | 401 |
+| POST | `/api/v1/payment-requests` | 請求作成 `{payer_user_id, currency, amount, memo?}` → 請求コード発行 | 400 自分宛て / 404 相手なし / 422 入力不正 |
+| GET | `/api/v1/payment-requests?limit=50` | 請求状況の一覧（した／された） | 401 |
+| GET | `/api/v1/payment-requests/{code}` | 請求コードから内容取得（支払い前の確認） | 404 コードなし・当事者以外 |
+| POST | `/api/v1/payment-requests/{code}/pay` | 請求コードを指定して支払う | 400 残高不足 / 404 コードなし / 409 支払い済み・取り消し済み |
+| POST | `/api/v1/payment-requests/{code}/cancel` | 請求を取り消す（請求者・未払いのみ） | 404 コードなし / 409 支払い済み |
 | GET | `/api/v1/saved-users` | 保存済みユーザー一覧 | 401 |
 | POST | `/api/v1/saved-users` | ユーザーを保存 `{user_id}` | 400 自分自身 / 404 宛先なし / 422 入力不正 |
 

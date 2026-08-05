@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
 import '../services/api_client.dart';
 import '../utils/money.dart';
+import '../widgets/payment_request_actions.dart';
 import 'saved_users_screen.dart';
 import 'transfer_screen.dart';
 
@@ -157,6 +158,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                   children: [
                     _ProfileCard(profile: data.profile),
+                    const SizedBox(height: 12),
+                    PaymentRequestActions(
+                      balances: data.balances,
+                      onChanged: _reload,
+                    ),
                     const SizedBox(height: 24),
                     Text('残高', style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 8),
