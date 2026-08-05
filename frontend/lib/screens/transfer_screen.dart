@@ -4,7 +4,7 @@ import '../models/models.dart';
 import '../services/api_client.dart';
 import '../utils/money.dart';
 
-/// 送金画面：宛先（ユーザーID）・通貨・金額を指定して送金する。
+/// 送金画面：宛先（ユーザーID）と日本円の金額を指定して送金する。
 class TransferScreen extends StatefulWidget {
   const TransferScreen({
     super.key,
@@ -20,12 +20,13 @@ class TransferScreen extends StatefulWidget {
 }
 
 class _TransferScreenState extends State<TransferScreen> {
+  static const _currency = 'JPY';
+
   final _formKey = GlobalKey<FormState>();
   final _recipientController = TextEditingController();
   final _amountController = TextEditingController();
   final _memoController = TextEditingController();
 
-  String? _currency;
   RecipientInfo? _verifiedRecipient;
   bool _isLookingUp = false;
   bool _isSending = false;
@@ -33,9 +34,6 @@ class _TransferScreenState extends State<TransferScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.balances.isNotEmpty) {
-      _currency = widget.balances.first.currency;
-    }
     final recipient = widget.initialRecipient;
     if (recipient != null) {
       _recipientController.text = recipient.userId;
@@ -96,7 +94,7 @@ class _TransferScreenState extends State<TransferScreen> {
     final recipient = _verifiedRecipient ?? await _lookupRecipient();
     if (recipient == null || !mounted) return;
 
-    final currency = _currency!;
+    const currency = _currency;
     final amount = _amountController.text.trim();
     final memo = _memoController.text.trim();
 
@@ -238,26 +236,11 @@ class _TransferScreenState extends State<TransferScreen> {
                   const SizedBox(height: 24),
                   Text('金額', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    initialValue: _currency,
-                    decoration: const InputDecoration(
-                      labelText: '通貨',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: widget.balances
-                        .map((b) => DropdownMenuItem(
-                              value: b.currency,
-                              child: Text(b.currency),
-                            ))
-                        .toList(),
-                    onChanged: (value) => setState(() => _currency = value),
-                    validator: (value) => value == null ? '通貨を選択してください' : null,
-                  ),
                   if (selectedBalance != null)
                     Padding(
-                      padding: const EdgeInsets.only(top: 4),
+                      padding: const EdgeInsets.only(bottom: 8),
                       child: Text(
-                        '利用可能残高: ${formatMoney(selectedBalance.currency, selectedBalance.amount)}',
+                        '日本円残高: ${formatMoney(_currency, selectedBalance.amount)}',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
@@ -268,6 +251,8 @@ class _TransferScreenState extends State<TransferScreen> {
                         const TextInputType.numberWithOptions(decimal: true),
                     decoration: const InputDecoration(
                       labelText: '送金金額',
+                      prefixText: '¥ ',
+                      suffixText: 'JPY',
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {

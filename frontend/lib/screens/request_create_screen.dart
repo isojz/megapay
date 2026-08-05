@@ -8,37 +8,23 @@ import '../utils/money.dart';
 
 /// 請求作成画面：相手のユーザーIDを指定して請求し、支払い用の請求コードを発行する。
 class RequestCreateScreen extends StatefulWidget {
-  const RequestCreateScreen({super.key, required this.balances});
-
-  /// 通貨の選択肢に使う（自分の保有通貨。空なら代表的な通貨を出す）
-  final List<Balance> balances;
+  const RequestCreateScreen({super.key});
 
   @override
   State<RequestCreateScreen> createState() => _RequestCreateScreenState();
 }
 
 class _RequestCreateScreenState extends State<RequestCreateScreen> {
-  static const _fallbackCurrencies = ['JPY', 'USD', 'EUR'];
+  static const _currency = 'JPY';
 
   final _formKey = GlobalKey<FormState>();
   final _payerController = TextEditingController();
   final _amountController = TextEditingController();
   final _memoController = TextEditingController();
 
-  String? _currency;
   RecipientInfo? _verifiedPayer;
   bool _isLookingUp = false;
   bool _isCreating = false;
-
-  List<String> get _currencies => widget.balances.isEmpty
-      ? _fallbackCurrencies
-      : widget.balances.map((b) => b.currency).toList();
-
-  @override
-  void initState() {
-    super.initState();
-    _currency = _currencies.first;
-  }
 
   @override
   void dispose() {
@@ -86,7 +72,7 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
     final payer = _verifiedPayer ?? await _lookupPayer();
     if (payer == null || !mounted) return;
 
-    final currency = _currency!;
+    const currency = _currency;
     final amount = _amountController.text.trim();
     final memo = _memoController.text.trim();
 
@@ -215,25 +201,14 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
                   const SizedBox(height: 24),
                   Text('金額', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    initialValue: _currency,
-                    decoration: const InputDecoration(
-                      labelText: '通貨',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: _currencies
-                        .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                        .toList(),
-                    onChanged: (value) => setState(() => _currency = value),
-                    validator: (value) => value == null ? '通貨を選択してください' : null,
-                  ),
-                  const SizedBox(height: 16),
                   TextFormField(
                     controller: _amountController,
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
                     decoration: const InputDecoration(
                       labelText: '請求金額',
+                      prefixText: '¥ ',
+                      suffixText: 'JPY',
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
