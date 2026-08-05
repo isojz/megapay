@@ -68,10 +68,7 @@ class PaymentRequestActions extends StatelessWidget {
                 _ActionItem(
                   icon: Icons.call_split,
                   label: '割り勘を作成',
-                  onTap: () => _open(
-                    context,
-                    SplitBillCreateScreen(balances: balances),
-                  ),
+                  onTap: () => _open(context, const SplitBillCreateScreen()),
                 ),
               ],
             ),
