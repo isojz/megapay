@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../utils/money.dart';
 
@@ -14,30 +15,20 @@ class SplitBillCreateScreen extends StatefulWidget {
 }
 
 class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
+  /// 結果ダイアログが極端に長くならないよう人数に上限を設ける。
+  static const _maxParticipants = 100;
+
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _amountController = TextEditingController();
-  final List<TextEditingController> _participantControllers = [
-    TextEditingController(),
-    TextEditingController(),
-  ];
+  final _countController = TextEditingController();
 
   @override
   void dispose() {
     _titleController.dispose();
     _amountController.dispose();
-    for (final c in _participantControllers) {
-      c.dispose();
-    }
+    _countController.dispose();
     super.dispose();
-  }
-
-  void _addParticipant() {
-    setState(() => _participantControllers.add(TextEditingController()));
-  }
-
-  void _removeParticipant(int index) {
-    setState(() => _participantControllers.removeAt(index).dispose());
   }
 
   /// 合計金額を参加者数で均等に分ける。余りは先頭の参加者から1円ずつ多く割り当てる。
@@ -53,27 +44,15 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
   Future<void> _create() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    final names = _participantControllers
-        .map((c) => c.text.trim())
-        .where((name) => name.isNotEmpty)
-        .toList();
-    if (names.length < 2) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('参加者を2人以上入力してください')),
-      );
-      return;
-    }
-
     final total = int.parse(_amountController.text.trim());
-    final shares = _splitAmount(total, names.length);
+    final count = int.parse(_countController.text.trim());
+    final shares = _splitAmount(total, count);
 
-    if (!mounted) return;
     await showDialog<void>(
       context: context,
       builder: (context) => _SplitResultDialog(
         title: _titleController.text.trim(),
         total: total.toString(),
-        names: names,
         shares: shares,
       ),
     );
@@ -110,6 +89,7 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                   TextFormField(
                     controller: _amountController,
                     keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration: const InputDecoration(
                       labelText: '合計金額',
                       suffixText: '円',
@@ -124,46 +104,29 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                     },
                   ),
                   const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '参加者',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ),
-                      TextButton.icon(
-                        onPressed: _addParticipant,
-                        icon: const Icon(Icons.add),
-                        label: const Text('追加'),
-                      ),
-                    ],
-                  ),
+                  Text('参加者', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
-                  for (var i = 0; i < _participantControllers.length; i++)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _participantControllers[i],
-                              decoration: InputDecoration(
-                                labelText: '参加者${i + 1}',
-                                border: const OutlineInputBorder(),
-                              ),
-                            ),
-                          ),
-                          if (_participantControllers.length > 2)
-                            IconButton(
-                              tooltip: '削除',
-                              icon: const Icon(Icons.remove_circle_outline),
-                              onPressed: () => _removeParticipant(i),
-                            ),
-                        ],
-                      ),
+                  TextFormField(
+                    controller: _countController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: const InputDecoration(
+                      labelText: '人数',
+                      suffixText: '人',
+                      border: OutlineInputBorder(),
                     ),
-                  const SizedBox(height: 16),
+                    validator: (value) {
+                      final count = int.tryParse(value?.trim() ?? '');
+                      if (count == null || count < 2) {
+                        return '2以上の人数を入力してください';
+                      }
+                      if (count > _maxParticipants) {
+                        return '人数は$_maxParticipants人までです';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 24),
                   FilledButton.icon(
                     onPressed: _create,
                     style: FilledButton.styleFrom(
@@ -187,19 +150,18 @@ class _SplitResultDialog extends StatelessWidget {
   const _SplitResultDialog({
     required this.title,
     required this.total,
-    required this.names,
     required this.shares,
   });
 
   final String title;
   final String total;
-  final List<String> names;
   final List<String> shares;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return AlertDialog(
+      scrollable: true,
       icon: const Icon(Icons.call_split, color: Colors.green, size: 48),
       title: Text(title.isEmpty ? '割り勘の結果' : title),
       content: SizedBox(
@@ -209,18 +171,18 @@ class _SplitResultDialog extends StatelessWidget {
           children: [
             Text(
               '合計 ${formatMoney(_currency, total)} を'
-              '${names.length}人で割り勘しました。',
+              '${shares.length}人で割り勘しました。',
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            for (var i = 0; i < names.length; i++)
+            for (var i = 0; i < shares.length; i++)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(
                   children: [
                     Expanded(
                       child: Text(
-                        names[i],
+                        '${i + 1}人目',
                         style: theme.textTheme.bodyMedium,
                       ),
                     ),
