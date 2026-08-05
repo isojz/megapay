@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// ログイン / 口座開設（サインアップ）画面。
@@ -10,12 +11,40 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  static const _savedEmailKey = 'saved_login_email';
+
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _displayNameController = TextEditingController();
   bool _isSignUp = false;
   bool _isLoading = false;
+  bool _rememberLogin = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreLoginInfo();
+  }
+
+  Future<void> _restoreLoginInfo() async {
+    final preferences = await SharedPreferences.getInstance();
+    final savedEmail = preferences.getString(_savedEmailKey);
+    if (!mounted || savedEmail == null) return;
+    setState(() {
+      _emailController.text = savedEmail;
+      _rememberLogin = true;
+    });
+  }
+
+  Future<void> _saveLoginInfo(String email) async {
+    final preferences = await SharedPreferences.getInstance();
+    if (_rememberLogin) {
+      await preferences.setString(_savedEmailKey, email);
+    } else {
+      await preferences.remove(_savedEmailKey);
+    }
+  }
 
   @override
   void dispose() {
@@ -30,19 +59,21 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     final auth = Supabase.instance.client.auth;
+    final email = _emailController.text.trim();
     try {
       if (_isSignUp) {
         await auth.signUp(
-          email: _emailController.text.trim(),
+          email: email,
           password: _passwordController.text,
           data: {'display_name': _displayNameController.text.trim()},
         );
       } else {
         await auth.signInWithPassword(
-          email: _emailController.text.trim(),
+          email: email,
           password: _passwordController.text,
         );
       }
+      await _saveLoginInfo(email);
       // 成功時は AuthGate が自動的にホーム画面へ切り替える
     } on AuthException catch (err) {
       _showError(err.message);
@@ -133,6 +164,21 @@ class _LoginScreenState extends State<LoginScreen> {
                         : null,
                     onFieldSubmitted: (_) => _submit(),
                   ),
+                  if (!_isSignUp) ...[
+                    const SizedBox(height: 4),
+                    CheckboxListTile(
+                      value: _rememberLogin,
+                      onChanged: _isLoading
+                          ? null
+                          : (value) => setState(
+                                () => _rememberLogin = value ?? false,
+                              ),
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: const Text('ログイン情報を保存する'),
+                      subtitle: const Text('次回、メールアドレスを自動入力します'),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   FilledButton(
                     onPressed: _isLoading ? null : _submit,

@@ -151,7 +151,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     _ProfileCard(profile: data.profile),
                     const SizedBox(height: 12),
                     PaymentRequestActions(
-                      balances: data.balances,
                       onChanged: _reload,
                       onTransfer: () => _openTransferScreen(data.balances),
                       onSavedUsers: () => _openSavedUsers(data.balances),

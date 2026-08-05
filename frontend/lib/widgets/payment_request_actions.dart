@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../models/models.dart';
 import '../screens/pay_request_screen.dart';
 import '../screens/request_create_screen.dart';
 import '../screens/request_list_screen.dart';
@@ -9,13 +8,10 @@ import '../screens/request_list_screen.dart';
 class PaymentRequestActions extends StatelessWidget {
   const PaymentRequestActions({
     super.key,
-    required this.balances,
     required this.onChanged,
     required this.onTransfer,
     required this.onSavedUsers,
   });
-
-  final List<Balance> balances;
 
   /// 画面から戻ったときに残高・履歴を再取得するためのコールバック
   final Future<void> Function() onChanged;
@@ -45,7 +41,7 @@ class PaymentRequestActions extends StatelessWidget {
                   label: '請求する',
                   onTap: () => _open(
                     context,
-                    RequestCreateScreen(balances: balances),
+                    const RequestCreateScreen(),
                   ),
                 ),
                 _ActionItem(
