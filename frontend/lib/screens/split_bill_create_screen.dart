@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../models/split_bill.dart';
+import '../services/api_client.dart';
 import '../utils/money.dart';
+import 'split_bill_detail_screen.dart';
 
 /// 割り勘は日本円のみ対応する。
 const _currency = 'JPY';
 
-/// 割り勘作成画面：合計金額と参加者を入力し、均等に割った金額を算出する。
+/// 件名を省略した場合に使う既定のイベント名。
+const _defaultTitle = '割り勘';
+
+/// 割り勘作成画面：合計金額と人数を入力して割り勘を登録し、参加用の請求コードを発行する。
+/// 発行したコードを参加者が入力すると、割り勘後の金額が自動で請求される。
 class SplitBillCreateScreen extends StatefulWidget {
   const SplitBillCreateScreen({super.key});
 
@@ -15,13 +22,15 @@ class SplitBillCreateScreen extends StatefulWidget {
 }
 
 class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
-  /// 結果ダイアログが極端に長くならないよう人数に上限を設ける。
+  /// 1件の割り勘に参加できる人数の上限（バックエンド側の制限に合わせる）。
   static const _maxParticipants = 100;
 
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _amountController = TextEditingController();
   final _countController = TextEditingController();
+
+  bool _isCreating = false;
 
   @override
   void dispose() {
@@ -31,33 +40,48 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
     super.dispose();
   }
 
-  /// 合計金額を参加者数で均等に分ける。余りは先頭の参加者から1円ずつ多く割り当てる。
-  List<String> _splitAmount(int total, int count) {
-    final base = total ~/ count;
-    final remainder = total % count;
-    return List.generate(
-      count,
-      (i) => (base + (i < remainder ? 1 : 0)).toString(),
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.error,
+      ),
     );
   }
 
   Future<void> _create() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    final total = int.parse(_amountController.text.trim());
+    final title = _titleController.text.trim();
+    final total = _amountController.text.trim();
     final count = int.parse(_countController.text.trim());
-    final shares = _splitAmount(total, count);
 
-    await showDialog<void>(
-      context: context,
-      builder: (context) => _SplitResultDialog(
-        title: _titleController.text.trim(),
-        total: total.toString(),
-        shares: shares,
-      ),
-    );
-    if (!mounted) return;
-    Navigator.of(context).pop();
+    setState(() => _isCreating = true);
+    try {
+      final bill = await ApiClient.instance.createSplitBill(
+        title: title.isEmpty ? _defaultTitle : title,
+        currency: _currency,
+        totalAmount: total,
+        participantCount: count,
+      );
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => _SplitBillCreatedDialog(bill: bill),
+      );
+      if (!mounted) return;
+      // 作成後はそのままグループ画面へ移動し、参加状況を確認できるようにする
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => SplitBillDetailScreen(billCode: bill.billCode),
+        ),
+      );
+    } on ApiException catch (err) {
+      _showError(err.message);
+    } finally {
+      if (mounted) setState(() => _isCreating = false);
+    }
   }
 
   @override
@@ -76,7 +100,7 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                 children: [
                   TextFormField(
                     controller: _titleController,
-                    maxLength: 200,
+                    maxLength: 100,
                     decoration: const InputDecoration(
                       labelText: '件名（任意）',
                       hintText: '例: 飲み会',
@@ -113,6 +137,7 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                     decoration: const InputDecoration(
                       labelText: '人数',
                       suffixText: '人',
+                      helperText: '自分を含めた人数。端数は切り上げます',
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
@@ -128,11 +153,17 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                   ),
                   const SizedBox(height: 24),
                   FilledButton.icon(
-                    onPressed: _create,
+                    onPressed: _isCreating ? null : _create,
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
-                    icon: const Icon(Icons.call_split),
+                    icon: _isCreating
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.call_split),
                     label: const Text('割り勘を作成'),
                   ),
                 ],
@@ -145,17 +176,19 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
   }
 }
 
-/// 割り勘の計算結果を一人ずつ表示する。
-class _SplitResultDialog extends StatelessWidget {
-  const _SplitResultDialog({
-    required this.title,
-    required this.total,
-    required this.shares,
-  });
+/// 作成した割り勘の参加用コードを大きく表示してコピーできるようにする。
+class _SplitBillCreatedDialog extends StatelessWidget {
+  const _SplitBillCreatedDialog({required this.bill});
 
-  final String title;
-  final String total;
-  final List<String> shares;
+  final SplitBill bill;
+
+  Future<void> _copyCode(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await Clipboard.setData(ClipboardData(text: bill.billCode));
+    messenger.showSnackBar(
+      const SnackBar(content: Text('請求コードをコピーしました')),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -163,39 +196,49 @@ class _SplitResultDialog extends StatelessWidget {
     return AlertDialog(
       scrollable: true,
       icon: const Icon(Icons.call_split, color: Colors.green, size: 48),
-      title: Text(title.isEmpty ? '割り勘の結果' : title),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '合計 ${formatMoney(_currency, total)} を'
-              '${shares.length}人で割り勘しました。',
-              textAlign: TextAlign.center,
+      title: const Text('割り勘を作成しました'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '${bill.title}\n'
+            '合計 ${formatMoney(bill.currency, bill.totalAmount)} を'
+            '${bill.participantCount}人で割り勘します。',
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          Text('1人あたり', style: theme.textTheme.bodySmall),
+          Text(
+            formatMoney(bill.currency, bill.shareAmount),
+            style: theme.textTheme.headlineSmall
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const Divider(height: 32),
+          Text('請求コード', style: theme.textTheme.bodySmall),
+          const SizedBox(height: 4),
+          SelectableText(
+            bill.billCode,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontFamily: 'monospace',
+              fontWeight: FontWeight.bold,
+              letterSpacing: 2,
             ),
-            const SizedBox(height: 16),
-            for (var i = 0; i < shares.length; i++)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '${i + 1}人目',
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                    ),
-                    Text(
-                      formatMoney(_currency, shares[i]),
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 8),
+          FilledButton.tonalIcon(
+            onPressed: () => _copyCode(context),
+            icon: const Icon(Icons.copy, size: 18),
+            label: const Text('コードをコピー'),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'このコードを参加者に伝えてください。'
+            '参加者が「割り勘に参加」でコードを入力すると、'
+            '${formatMoney(bill.currency, bill.shareAmount)} の請求が届きます。',
+            style: theme.textTheme.bodySmall,
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
       actions: [
         FilledButton(
