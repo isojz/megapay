@@ -82,7 +82,8 @@ erDiagram
         numeric amount "0より大"
         text memo
         text status "pending/paid/cancelled"
-        uuid transfer_id FK "成立した送金"
+        text payment_method "balance/cash"
+        uuid transfer_id FK "成立した送金（現金払いは null）"
         timestamptz created_at
         timestamptz paid_at
         timestamptz cancelled_at
@@ -197,6 +198,18 @@ sequenceDiagram
 支払い・残高の移動は既存の請求機能（`pay_payment_request` → `internal_move_funds`）を
 そのまま通るため、資金移動のロジックは 1 箇所のままになっている。
 
+### 支払い方法（残高 / 現金）
+
+飲み会などではその場で現金を渡すこともあるため、請求には支払い方法を持たせている。
+
+| 方法 | 残高・送金履歴 | 請求の状態 | 用途 |
+| --- | --- | --- | --- |
+| `balance` | 送金が実行され、`transfer_id` が入る | `paid` | アプリ内で支払う |
+| `cash` | **一切変更しない**（`transfer_id` は null） | `paid` | その場で現金を渡した記録 |
+
+現金払いは支払い者の自己申告で記録し、集金者は参加者一覧で「現金で受取済み」と判別できる。
+どちらの方法でも請求行をロックしてから更新するため、同時に実行しても二重計上されない。
+
 ## API 仕様（v1）
 
 すべて `Authorization: Bearer <Supabase アクセストークン>` が必要（`/health` を除く）。
@@ -213,7 +226,8 @@ sequenceDiagram
 | POST | `/api/v1/payment-requests` | 請求作成 `{payer_user_id, currency, amount, memo?}` → 請求コード発行 | 400 自分宛て / 404 相手なし / 422 入力不正 |
 | GET | `/api/v1/payment-requests?limit=50` | 請求状況の一覧（した／された） | 401 |
 | GET | `/api/v1/payment-requests/{code}` | 請求コードから内容取得（支払い前の確認） | 404 コードなし・当事者以外 |
-| POST | `/api/v1/payment-requests/{code}/pay` | 請求コードを指定して支払う | 400 残高不足 / 404 コードなし / 409 支払い済み・取り消し済み |
+| POST | `/api/v1/payment-requests/{code}/pay` | 請求コードを指定して残高から支払う | 400 残高不足 / 404 コードなし / 409 支払い済み・取り消し済み |
+| POST | `/api/v1/payment-requests/{code}/pay-cash` | 現金で支払った記録を残す（残高・履歴は動かさない） | 404 コードなし / 409 支払い済み・取り消し済み |
 | POST | `/api/v1/payment-requests/{code}/cancel` | 請求を取り消す（請求者・未払いのみ） | 404 コードなし / 409 支払い済み |
 | POST | `/api/v1/split-bills` | 割り勘を登録 `{title, currency, total_amount, participant_count}` → 請求コード発行 | 400 入力不正 / 422 入力不正 |
 | GET | `/api/v1/split-bills?limit=50` | 自分が関わる割り勘の一覧 | 401 |
