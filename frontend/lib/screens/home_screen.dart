@@ -163,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
 ),
                 
                     const SizedBox(height: 12),
-                    SplitBillActions(onChanged: _reload),
+                    // SplitBillActions(onChanged: _reload),
                     const SizedBox(height: 24),
                     Text('残高', style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 8),
