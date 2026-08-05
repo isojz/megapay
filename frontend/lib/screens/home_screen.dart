@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
 import '../services/api_client.dart';
 import '../utils/money.dart';
+import 'saved_users_screen.dart';
 import 'transfer_screen.dart';
 
 class _HomeData {
@@ -64,6 +65,28 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _openSavedUsers(List<Balance> balances) async {
+    final sent = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => SavedUsersScreen(balances: balances)),
+    );
+    if (sent == true && mounted) await _reload();
+  }
+
+  Future<void> _saveCounterpart(TransferRecord record) async {
+    try {
+      await ApiClient.instance.saveUser(record.counterpartUserId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${record.counterpartName} さんを保存しました')),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    }
+  }
+
   Future<void> _signOut() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -94,6 +117,16 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('MegaPay'),
         actions: [
+          FutureBuilder<_HomeData>(
+            future: _future,
+            builder: (context, snapshot) => IconButton(
+              tooltip: 'ユーザー一覧',
+              icon: const Icon(Icons.people_outline),
+              onPressed: snapshot.hasData
+                  ? () => _openSavedUsers(snapshot.data!.balances)
+                  : null,
+            ),
+          ),
           IconButton(
             tooltip: 'ログアウト',
             icon: const Icon(Icons.logout),
@@ -139,7 +172,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       const Card(
                         child: ListTile(title: Text('まだ送金履歴がありません')),
                       ),
-                    ...data.transfers.map((t) => _TransferTile(record: t)),
+                    ...data.transfers.map(
+                      (t) => _TransferTile(
+                        record: t,
+                        onSave: () => _saveCounterpart(t),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -269,9 +307,10 @@ class _BalanceTile extends StatelessWidget {
 }
 
 class _TransferTile extends StatelessWidget {
-  const _TransferTile({required this.record});
+  const _TransferTile({required this.record, required this.onSave});
 
   final TransferRecord record;
+  final VoidCallback onSave;
 
   @override
   Widget build(BuildContext context) {
@@ -299,10 +338,25 @@ class _TransferTile extends StatelessWidget {
           ].join('\n'),
         ),
         isThreeLine: true,
-        trailing: Text(
-          '$sign${formatMoney(record.currency, record.amount)}',
-          style: theme.textTheme.titleSmall
-              ?.copyWith(fontWeight: FontWeight.bold, color: color),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              '$sign${formatMoney(record.currency, record.amount)}',
+              style: theme.textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.bold, color: color),
+            ),
+            SizedBox(
+              height: 28,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                tooltip: 'ユーザーを保存',
+                onPressed: onSave,
+                icon: const Icon(Icons.bookmark_add_outlined, size: 20),
+              ),
+            ),
+          ],
         ),
       ),
     );

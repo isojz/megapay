@@ -107,6 +107,8 @@ sequenceDiagram
 | GET | `/api/v1/recipients/{user_id}` | 宛先確認（表示名の取得） | 404 宛先なし |
 | POST | `/api/v1/transfers` | 送金実行 `{recipient_user_id, currency, amount, memo?}` | 400 残高不足・自分宛て / 404 宛先なし / 422 入力不正 |
 | GET | `/api/v1/transfers?limit=50` | 送金・受取履歴（新しい順） | 401 |
+| GET | `/api/v1/saved-users` | 保存済みユーザー一覧 | 401 |
+| POST | `/api/v1/saved-users` | ユーザーを保存 `{user_id}` | 400 自分自身 / 404 宛先なし / 422 入力不正 |
 
 エラーレスポンスは `{"detail": "<日本語メッセージ>"}` 形式。
 DB 関数の `INSUFFICIENT_FUNDS` 等のエラーキーワードは `backend/app/errors.py` で HTTP ステータスへ変換する。
