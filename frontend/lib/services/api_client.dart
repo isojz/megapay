@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config.dart';
 import '../models/models.dart';
+import '../models/payment_request.dart';
 
 /// バックエンド API 呼び出しで発生したエラー。
 /// message はそのままユーザーに表示できる日本語文言。
@@ -92,6 +93,57 @@ class ApiClient {
         await _get('/api/v1/recipients/${Uri.encodeComponent(recipientUserId)}')
             as Map<String, dynamic>,
       );
+
+  // ---------------- 請求（payment requests） ----------------
+
+  /// 請求を作成し、支払い用の請求コードを発行する
+  Future<PaymentRequest> createPaymentRequest({
+    required String payerUserId,
+    required String currency,
+    required String amount,
+    String? memo,
+  }) async =>
+      PaymentRequest.fromJson(
+        await _post('/api/v1/payment-requests', {
+          'payer_user_id': payerUserId,
+          'currency': currency,
+          'amount': amount,
+          if (memo != null && memo.isNotEmpty) 'memo': memo,
+        }) as Map<String, dynamic>,
+      );
+
+  /// 請求コードから内容を取得する（支払い前の確認用）
+  Future<PaymentRequest> lookupPaymentRequest(String requestCode) async =>
+      PaymentRequest.fromJson(
+        await _get('/api/v1/payment-requests/${Uri.encodeComponent(requestCode)}')
+            as Map<String, dynamic>,
+      );
+
+  /// 請求コードを指定して支払う（送金が実行される）
+  Future<PaymentRequest> payPaymentRequest(String requestCode) async =>
+      PaymentRequest.fromJson(
+        await _post(
+          '/api/v1/payment-requests/${Uri.encodeComponent(requestCode)}/pay',
+          const {},
+        ) as Map<String, dynamic>,
+      );
+
+  /// 請求を取り消す（請求した本人・未払いのもののみ）
+  Future<PaymentRequest> cancelPaymentRequest(String requestCode) async =>
+      PaymentRequest.fromJson(
+        await _post(
+          '/api/v1/payment-requests/${Uri.encodeComponent(requestCode)}/cancel',
+          const {},
+        ) as Map<String, dynamic>,
+      );
+
+  /// 自分が請求した / 請求された一覧（請求状況の確認）
+  Future<List<PaymentRequest>> fetchPaymentRequests() async =>
+      (await _get('/api/v1/payment-requests') as List)
+          .map((e) => PaymentRequest.fromJson(e as Map<String, dynamic>))
+          .toList();
+
+  // ---------------- 送金 ----------------
 
   Future<void> sendTransfer({
     required String recipientUserId,
