@@ -4,6 +4,7 @@ import '../screens/pay_request_screen.dart';
 import '../screens/request_create_screen.dart';
 import '../screens/request_list_screen.dart';
 import '../screens/split_bill_create_screen.dart';
+import '../screens/withdraw_screen.dart';
 
 /// ホーム画面の主要機能をカテゴリ別にまとめたメニュー。
 class PaymentRequestActions extends StatelessWidget {
@@ -48,12 +49,18 @@ class PaymentRequestActions extends StatelessWidget {
                 _ActionItem(
                   icon: Icons.password,
                   label: 'コードで支払う',
-                  onTap: () => _open(context, const PayRequestScreen()),
+                  onTap: () => _open(
+                    context,
+                    const PayRequestScreen(),
+                  ),
                 ),
                 _ActionItem(
                   icon: Icons.fact_check_outlined,
                   label: '請求状況',
-                  onTap: () => _open(context, const RequestListScreen()),
+                  onTap: () => _open(
+                    context,
+                    const RequestListScreen(),
+                  ),
                 ),
               ],
             ),
@@ -70,12 +77,21 @@ class PaymentRequestActions extends StatelessWidget {
             ),
             const Divider(height: 32),
             _ActionSection(
-              title: '送金',
+            
+              title: '送金・出金',
               children: [
                 _ActionItem(
                   icon: Icons.send_outlined,
                   label: '送金する',
                   onTap: onTransfer,
+                ),
+                _ActionItem(
+                  icon: Icons.account_balance_wallet_outlined,
+                  label: '出金',
+                  onTap: () => _open(
+                    context,
+                    WithdrawScreen(balances: balances),
+                  ),
                 ),
               ],
             ),
@@ -98,7 +114,10 @@ class PaymentRequestActions extends StatelessWidget {
 }
 
 class _ActionSection extends StatelessWidget {
-  const _ActionSection({required this.title, required this.children});
+  const _ActionSection({
+    required this.title,
+    required this.children,
+  });
 
   final String title;
   final List<Widget> children;
@@ -116,7 +135,11 @@ class _ActionSection extends StatelessWidget {
               ?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
-        Wrap(spacing: 8, runSpacing: 8, children: children),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: children,
+        ),
       ],
     );
   }
@@ -136,13 +159,17 @@ class _ActionItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     return SizedBox(
       width: 104,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          padding: const EdgeInsets.symmetric(
+            vertical: 8,
+            horizontal: 4,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
