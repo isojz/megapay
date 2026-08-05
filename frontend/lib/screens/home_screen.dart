@@ -10,6 +10,9 @@ import '../widgets/split_bill_actions.dart';
 import 'saved_users_screen.dart';
 import 'transfer_screen.dart';
 
+/// 現在は日本円のみを扱う。デモ用に作られる USD / EUR の残高は表示しない。
+const _supportedCurrency = 'JPY';
+
 class _HomeData {
   const _HomeData(this.profile, this.balances, this.transfers);
 
@@ -42,9 +45,12 @@ class _HomeScreenState extends State<HomeScreen> {
       api.fetchBalances(),
       api.fetchTransfers(),
     ]);
+    final balances = (results[1] as List<Balance>)
+        .where((b) => b.currency == _supportedCurrency)
+        .toList();
     return _HomeData(
       results[0] as Profile,
-      results[1] as List<Balance>,
+      balances,
       results[2] as List<TransferRecord>,
     );
   }
