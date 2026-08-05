@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
-from .routers import balances, profile, transfers
+from .routers import balances, profile, saved_users, transfers
 
 app = FastAPI(
     title="MegaPay API",
@@ -20,6 +20,7 @@ app.add_middleware(
 app.include_router(profile.router)
 app.include_router(balances.router)
 app.include_router(transfers.router)
+app.include_router(saved_users.router)
 
 
 @app.get("/health", tags=["meta"])
