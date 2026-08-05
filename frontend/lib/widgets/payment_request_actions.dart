@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../screens/join_split_bill_screen.dart';
+import '../models/models.dart';
 import '../screens/pay_request_screen.dart';
 import '../screens/request_create_screen.dart';
 import '../screens/request_list_screen.dart';
@@ -12,10 +13,13 @@ import '../screens/split_bill_list_screen.dart';
 class PaymentRequestActions extends StatelessWidget {
   const PaymentRequestActions({
     super.key,
+    required this.balances,
     required this.onChanged,
     required this.onTransfer,
     required this.onSavedUsers,
   });
+
+  final List<Balance> balances;
 
   /// 画面から戻ったときに残高・履歴を再取得するためのコールバック
   final Future<void> Function() onChanged;
@@ -73,7 +77,10 @@ class PaymentRequestActions extends StatelessWidget {
                 _ActionItem(
                   icon: Icons.call_split,
                   label: '割り勘を作成',
-                  onTap: () => _open(context, const SplitBillCreateScreen()),
+                  onTap: () => _open(
+                    context,
+                    const SplitBillCreateScreen(),
+                  ),
                 ),
                 _ActionItem(
                   icon: Icons.group_add,
@@ -89,7 +96,6 @@ class PaymentRequestActions extends StatelessWidget {
             ),
             const Divider(height: 32),
             _ActionSection(
-            
               title: '送金・出金',
               children: [
                 _ActionItem(
