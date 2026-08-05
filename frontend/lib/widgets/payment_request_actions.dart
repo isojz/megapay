@@ -5,18 +5,22 @@ import '../screens/pay_request_screen.dart';
 import '../screens/request_create_screen.dart';
 import '../screens/request_list_screen.dart';
 
-/// ホーム画面に置く請求機能の入口（請求する／コードで支払う／請求状況）。
+/// ホーム画面の主要機能をカテゴリ別にまとめたメニュー。
 class PaymentRequestActions extends StatelessWidget {
   const PaymentRequestActions({
     super.key,
     required this.balances,
     required this.onChanged,
+    required this.onTransfer,
+    required this.onSavedUsers,
   });
 
   final List<Balance> balances;
 
   /// 画面から戻ったときに残高・履歴を再取得するためのコールバック
   final Future<void> Function() onChanged;
+  final VoidCallback onTransfer;
+  final VoidCallback onSavedUsers;
 
   Future<void> _open(BuildContext context, Widget screen) async {
     await Navigator.of(context).push(
@@ -29,30 +33,83 @@ class PaymentRequestActions extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _ActionItem(
-              icon: Icons.receipt_long,
-              label: '請求する',
-              onTap: () => _open(
-                context,
-                RequestCreateScreen(balances: balances),
-              ),
+            _ActionSection(
+              title: '請求',
+              children: [
+                _ActionItem(
+                  icon: Icons.receipt_long,
+                  label: '請求する',
+                  onTap: () => _open(
+                    context,
+                    RequestCreateScreen(balances: balances),
+                  ),
+                ),
+                _ActionItem(
+                  icon: Icons.password,
+                  label: 'コードで支払う',
+                  onTap: () => _open(context, const PayRequestScreen()),
+                ),
+                _ActionItem(
+                  icon: Icons.fact_check_outlined,
+                  label: '請求状況',
+                  onTap: () => _open(context, const RequestListScreen()),
+                ),
+              ],
             ),
-            _ActionItem(
-              icon: Icons.password,
-              label: 'コードで支払う',
-              onTap: () => _open(context, const PayRequestScreen()),
+            const Divider(height: 32),
+            _ActionSection(
+              title: '送金',
+              children: [
+                _ActionItem(
+                  icon: Icons.send_outlined,
+                  label: '送金する',
+                  onTap: onTransfer,
+                ),
+              ],
             ),
-            _ActionItem(
-              icon: Icons.fact_check_outlined,
-              label: '請求状況',
-              onTap: () => _open(context, const RequestListScreen()),
+            const Divider(height: 32),
+            _ActionSection(
+              title: 'ユーザー',
+              children: [
+                _ActionItem(
+                  icon: Icons.people_outline,
+                  label: 'ユーザー一覧',
+                  onTap: onSavedUsers,
+                ),
+              ],
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ActionSection extends StatelessWidget {
+  const _ActionSection({required this.title, required this.children});
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context)
+              .textTheme
+              .titleSmall
+              ?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, runSpacing: 8, children: children),
+      ],
     );
   }
 }
@@ -71,21 +128,27 @@ class _ActionItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Expanded(
+    return SizedBox(
+      width: 104,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: theme.colorScheme.primary),
-              const SizedBox(height: 6),
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: theme.colorScheme.primaryContainer,
+                foregroundColor: theme.colorScheme.onPrimaryContainer,
+                child: Icon(icon),
+              ),
+              const SizedBox(height: 8),
               Text(
                 label,
                 textAlign: TextAlign.center,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.labelMedium,
               ),

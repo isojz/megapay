@@ -118,16 +118,6 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('MegaPay'),
         actions: [
-          FutureBuilder<_HomeData>(
-            future: _future,
-            builder: (context, snapshot) => IconButton(
-              tooltip: 'ユーザー一覧',
-              icon: const Icon(Icons.people_outline),
-              onPressed: snapshot.hasData
-                  ? () => _openSavedUsers(snapshot.data!.balances)
-                  : null,
-            ),
-          ),
           IconButton(
             tooltip: 'ログアウト',
             icon: const Icon(Icons.logout),
@@ -162,6 +152,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     PaymentRequestActions(
                       balances: data.balances,
                       onChanged: _reload,
+                      onTransfer: () => _openTransferScreen(data.balances),
+                      onSavedUsers: () => _openSavedUsers(data.balances),
                     ),
                     const SizedBox(height: 24),
                     Text('残高', style: Theme.of(context).textTheme.titleMedium),
@@ -188,18 +180,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-          );
-        },
-      ),
-      floatingActionButton: FutureBuilder<_HomeData>(
-        future: _future,
-        builder: (context, snapshot) {
-          final balances = snapshot.data?.balances ?? const <Balance>[];
-          return FloatingActionButton.extended(
-            onPressed:
-                snapshot.hasData ? () => _openTransferScreen(balances) : null,
-            icon: const Icon(Icons.send),
-            label: const Text('送金する'),
           );
         },
       ),
