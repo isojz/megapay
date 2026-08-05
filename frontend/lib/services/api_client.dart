@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config.dart';
 import '../models/models.dart';
 import '../models/payment_request.dart';
+import '../models/split_bill.dart';
 
 /// バックエンド API 呼び出しで発生したエラー。
 /// message はそのままユーザーに表示できる日本語文言。
@@ -141,6 +142,54 @@ class ApiClient {
   Future<List<PaymentRequest>> fetchPaymentRequests() async =>
       (await _get('/api/v1/payment-requests') as List)
           .map((e) => PaymentRequest.fromJson(e as Map<String, dynamic>))
+          .toList();
+
+  // ---------------- 割り勘（split bills） ----------------
+
+  /// 割り勘を登録し、参加用の請求コードを発行する（集金者）
+  Future<SplitBill> createSplitBill({
+    required String title,
+    required String currency,
+    required String totalAmount,
+    required int participantCount,
+  }) async =>
+      SplitBill.fromJson(
+        await _post('/api/v1/split-bills', {
+          'title': title,
+          'currency': currency,
+          'total_amount': totalAmount,
+          'participant_count': participantCount,
+        }) as Map<String, dynamic>,
+      );
+
+  /// 請求コードから割り勘の内容を取得する（参加前の確認）
+  Future<SplitBill> lookupSplitBill(String billCode) async => SplitBill.fromJson(
+        await _get('/api/v1/split-bills/${Uri.encodeComponent(billCode)}')
+            as Map<String, dynamic>,
+      );
+
+  /// 請求コードでグループに参加する（同時に自分あての請求が作成される）
+  Future<SplitBill> joinSplitBill(String billCode) async => SplitBill.fromJson(
+        await _post(
+          '/api/v1/split-bills/${Uri.encodeComponent(billCode)}/join',
+          const {},
+        ) as Map<String, dynamic>,
+      );
+
+  /// グループの参加者と支払い状況の一覧
+  Future<List<SplitBillParticipant>> fetchSplitBillParticipants(
+    String billCode,
+  ) async =>
+      (await _get(
+        '/api/v1/split-bills/${Uri.encodeComponent(billCode)}/participants',
+      ) as List)
+          .map((e) => SplitBillParticipant.fromJson(e as Map<String, dynamic>))
+          .toList();
+
+  /// 自分が関わる割り勘の一覧（集金した分・参加した分）
+  Future<List<SplitBill>> fetchSplitBills() async =>
+      (await _get('/api/v1/split-bills') as List)
+          .map((e) => SplitBill.fromJson(e as Map<String, dynamic>))
           .toList();
 
   // ---------------- 送金 ----------------
