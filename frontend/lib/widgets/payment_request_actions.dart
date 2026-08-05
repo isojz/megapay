@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../screens/pay_request_screen.dart';
 import '../screens/request_create_screen.dart';
 import '../screens/request_list_screen.dart';
+import '../screens/split_bill_create_screen.dart';
 
 /// ホーム画面の主要機能をカテゴリ別にまとめたメニュー。
 class PaymentRequestActions extends StatelessWidget {
@@ -53,6 +54,17 @@ class PaymentRequestActions extends StatelessWidget {
                   icon: Icons.fact_check_outlined,
                   label: '請求状況',
                   onTap: () => _open(context, const RequestListScreen()),
+                ),
+              ],
+            ),
+            const Divider(height: 32),
+            _ActionSection(
+              title: '割り勘',
+              children: [
+                _ActionItem(
+                  icon: Icons.call_split,
+                  label: '割り勘を作成',
+                  onTap: () => _open(context, const SplitBillCreateScreen()),
                 ),
               ],
             ),
