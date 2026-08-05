@@ -40,6 +40,22 @@ class RecipientInfo {
       );
 }
 
+class SavedUser extends RecipientInfo {
+  const SavedUser({
+    required super.userId,
+    required super.displayName,
+    required this.createdAt,
+  });
+
+  final DateTime createdAt;
+
+  factory SavedUser.fromJson(Map<String, dynamic> json) => SavedUser(
+        userId: json['user_id'] as String,
+        displayName: json['display_name'] as String? ?? '',
+        createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+      );
+}
+
 class TransferRecord {
   const TransferRecord({
     required this.id,

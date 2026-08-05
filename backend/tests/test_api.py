@@ -196,3 +196,43 @@ def test_transfer_history(client, monkeypatch):
     assert len(body) == 1
     assert body[0]["direction"] == "sent"
     assert body[0]["amount"] == "120.5"
+
+
+def test_saved_users(client, monkeypatch):
+    monkeypatch.setattr(
+        db,
+        "list_saved_users",
+        lambda token: [
+            {
+                "user_id": "MP-99990000",
+                "display_name": "花子",
+                "created_at": "2026-08-05T09:00:00+00:00",
+            }
+        ],
+    )
+    res = client.get("/api/v1/saved-users")
+    assert res.status_code == 200
+    assert res.json()[0]["display_name"] == "花子"
+
+
+def test_save_user_normalizes_input(client, monkeypatch):
+    captured = {}
+
+    def fake_save(token, user_id):
+        captured["user_id"] = user_id
+        return {"user_id": "MP-99990000", "display_name": "花子"}
+
+    monkeypatch.setattr(db, "save_user", fake_save)
+    res = client.post("/api/v1/saved-users", json={"user_id": " MP-99990000 "})
+    assert res.status_code == 201
+    assert captured["user_id"] == "MP-99990000"
+    assert res.json()["display_name"] == "花子"
+
+
+def test_save_self_maps_error(client, monkeypatch):
+    def fake_save(*args, **kwargs):
+        raise _api_error("SELF_SAVE")
+
+    monkeypatch.setattr(db, "save_user", fake_save)
+    res = client.post("/api/v1/saved-users", json={"user_id": "MP-11112222"})
+    assert res.status_code == 400

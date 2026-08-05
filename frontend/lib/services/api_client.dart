@@ -163,4 +163,15 @@ class ApiClient {
       (await _get('/api/v1/transfers') as List)
           .map((e) => TransferRecord.fromJson(e as Map<String, dynamic>))
           .toList();
+
+  Future<List<SavedUser>> fetchSavedUsers() async =>
+      (await _get('/api/v1/saved-users') as List)
+          .map((e) => SavedUser.fromJson(e as Map<String, dynamic>))
+          .toList();
+
+  Future<RecipientInfo> saveUser(String userId) async =>
+      RecipientInfo.fromJson(
+        await _post('/api/v1/saved-users', {'user_id': userId})
+            as Map<String, dynamic>,
+      );
 }

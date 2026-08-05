@@ -21,6 +21,14 @@ class RecipientResponse(BaseModel):
     display_name: str
 
 
+class SavedUserCreate(BaseModel):
+    user_id: str = Field(min_length=1, max_length=32)
+
+
+class SavedUserResponse(RecipientResponse):
+    created_at: datetime
+
+
 class TransferCreate(BaseModel):
     recipient_user_id: str = Field(min_length=1, max_length=32)
     currency: str = Field(pattern=r"^[A-Za-z0-9]{3,10}$")

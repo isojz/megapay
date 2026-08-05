@@ -84,3 +84,13 @@ def execute_transfer(
 def list_transfers(token: str, limit: int = 50) -> list[dict[str, Any]]:
     res = _client(token).rpc("list_my_transfers", {"p_limit": limit}).execute()
     return res.data
+
+
+def list_saved_users(token: str) -> list[dict[str, Any]]:
+    res = _client(token).rpc("list_my_saved_users", {}).execute()
+    return res.data
+
+
+def save_user(token: str, user_id: str) -> dict[str, Any]:
+    res = _client(token).rpc("save_user", {"p_user_id": user_id}).execute()
+    return res.data

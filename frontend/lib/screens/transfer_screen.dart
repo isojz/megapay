@@ -6,9 +6,14 @@ import '../utils/money.dart';
 
 /// 送金画面：宛先（ユーザーID）・通貨・金額を指定して送金する。
 class TransferScreen extends StatefulWidget {
-  const TransferScreen({super.key, required this.balances});
+  const TransferScreen({
+    super.key,
+    required this.balances,
+    this.initialRecipient,
+  });
 
   final List<Balance> balances;
+  final RecipientInfo? initialRecipient;
 
   @override
   State<TransferScreen> createState() => _TransferScreenState();
@@ -30,6 +35,11 @@ class _TransferScreenState extends State<TransferScreen> {
     super.initState();
     if (widget.balances.isNotEmpty) {
       _currency = widget.balances.first.currency;
+    }
+    final recipient = widget.initialRecipient;
+    if (recipient != null) {
+      _recipientController.text = recipient.userId;
+      _verifiedRecipient = recipient;
     }
   }
 
