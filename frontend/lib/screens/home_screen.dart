@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
 import '../services/api_client.dart';
+import '../theme.dart';
 import '../utils/money.dart';
 import '../utils/browser_url.dart';
 import '../widgets/payment_request_actions.dart';
@@ -136,7 +137,26 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('MegaPay'),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.currency_exchange,
+              size: 28,
+              color: megaPayOnBrandColor,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'MegaPay',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: megaPayOnBrandColor,
+                    fontFamily: 'NotoSansJP',
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.3,
+                  ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             tooltip: 'ログアウト',
