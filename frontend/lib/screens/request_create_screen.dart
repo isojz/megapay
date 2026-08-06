@@ -5,6 +5,7 @@ import '../models/models.dart';
 import '../models/payment_request.dart';
 import '../services/api_client.dart';
 import '../utils/money.dart';
+import '../widgets/saved_user_picker.dart';
 
 /// 請求作成画面：相手のユーザーIDを指定して請求し、支払い用の請求コードを発行する。
 class RequestCreateScreen extends StatefulWidget {
@@ -56,6 +57,17 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
         backgroundColor: Theme.of(context).colorScheme.error,
       ),
     );
+  }
+
+  /// ユーザー一覧から請求先を選ぶ。保存済みユーザーは表示名も分かっているため、
+  /// 選んだ時点で確認済みとして扱う。
+  Future<void> _pickFromSavedUsers() async {
+    final picked = await SavedUserPicker.show(context);
+    if (picked == null || !mounted) return;
+    setState(() {
+      _payerController.text = picked.userId;
+      _verifiedPayer = picked;
+    });
   }
 
   /// 請求先のユーザーIDから相手を検索して表示名を確認する。
@@ -252,8 +264,15 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
                       ),
                     ],
                   ),
-                  if (_verifiedPayer != null) ...[
-                    const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _pickFromSavedUsers,
+                      icon: const Icon(Icons.people_outline),
+                      label: const Text('ユーザー一覧から選ぶ'),
+                    ),
+                  ),
+                  if (_verifiedPayer != null)
                     Card(
                       color: Colors.green.shade50,
                       child: ListTile(
@@ -267,7 +286,6 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
                         subtitle: Text(_verifiedPayer!.userId),
                       ),
                     ),
-                  ],
                   const SizedBox(height: 24),
                   Text(
                     '金額',
