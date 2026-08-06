@@ -27,6 +27,9 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _rememberLogin = true;
 
+  /// パスワードは既定で伏せ、目のボタンで表示を切り替える。
+  bool _passwordVisible = false;
+
   @override
   void initState() {
     super.initState();
@@ -176,10 +179,21 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _passwordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
+                    obscureText: !_passwordVisible,
+                    decoration: InputDecoration(
                       labelText: 'パスワード（6文字以上）',
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        tooltip: _passwordVisible ? 'パスワードを隠す' : 'パスワードを表示',
+                        icon: Icon(
+                          _passwordVisible
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                        ),
+                        onPressed: () => setState(
+                          () => _passwordVisible = !_passwordVisible,
+                        ),
+                      ),
                     ),
                     validator: (value) => (value == null || value.length < 6)
                         ? 'パスワードは6文字以上で入力してください'
@@ -220,8 +234,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: _isLoading
                         ? null
                         : () => setState(() => _isSignUp = !_isSignUp),
-                    child: Text(
-                        _isSignUp ? 'アカウントをお持ちの方はログイン' : '初めての方はアカウント開設'),
+                    child:
+                        Text(_isSignUp ? 'アカウントをお持ちの方はログイン' : '初めての方はアカウント開設'),
                   ),
                 ],
               ),

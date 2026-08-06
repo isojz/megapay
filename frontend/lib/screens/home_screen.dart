@@ -327,29 +327,38 @@ class _ProfileCard extends StatelessWidget {
   }
 }
 
-class _BalanceTile extends StatelessWidget {
+class _BalanceTile extends StatefulWidget {
   const _BalanceTile({required this.balance});
 
   final Balance balance;
 
   @override
+  State<_BalanceTile> createState() => _BalanceTileState();
+}
+
+class _BalanceTileState extends State<_BalanceTile> {
+  /// 人に見られないよう既定では伏せ、目のボタンで表示を切り替える。
+  bool _visible = false;
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Card(
       child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-          child: Text(
-            balance.currency.substring(0, 1),
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
-        // 金額は trailing（右寄せ）ではなく title に置いて左揃えにする
+        // 金額は title に置いて左揃えにし、目のボタンを trailing（右）に置く
         title: Text(
-          formatYen(balance.amount),
-          style: Theme.of(context)
-              .textTheme
-              .headlineMedium
+          _visible ? formatYen(widget.balance.amount) : '•••••• 円',
+          style: theme.textTheme.headlineMedium
               ?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        trailing: IconButton(
+          tooltip: _visible ? '残高を隠す' : '残高を表示',
+          icon: Icon(
+            _visible
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
+          ),
+          onPressed: () => setState(() => _visible = !_visible),
         ),
       ),
     );
