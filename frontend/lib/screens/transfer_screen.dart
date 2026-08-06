@@ -32,6 +32,9 @@ class _TransferScreenState extends State<TransferScreen> {
   bool _isLookingUp = false;
   bool _isSending = false;
 
+  /// 自分自身への送金を送信前に弾くために保持する。
+  String? _myUserId;
+
   @override
   void initState() {
     super.initState();
@@ -40,6 +43,24 @@ class _TransferScreenState extends State<TransferScreen> {
       _recipientController.text = recipient.userId;
       _verifiedRecipient = recipient;
     }
+    _loadMyUserId();
+  }
+
+  Future<void> _loadMyUserId() async {
+    try {
+      final profile = await ApiClient.instance.fetchProfile();
+      if (mounted) setState(() => _myUserId = profile.userId);
+    } on ApiException {
+      // 取得できなくてもサーバー側で弾かれるため、ここでは何もしない
+    }
+  }
+
+  /// 入力されたユーザーIDが自分自身かどうか。
+  /// ユーザーIDは大文字で扱われるため、比較時に揃える。
+  bool _isMyself(String userId) {
+    final myUserId = _myUserId;
+    return myUserId != null &&
+        userId.trim().toUpperCase() == myUserId.toUpperCase();
   }
 
   @override
@@ -83,6 +104,10 @@ class _TransferScreenState extends State<TransferScreen> {
     final recipientId = _recipientController.text.trim();
     if (recipientId.isEmpty) {
       _showError('送金先のユーザーIDを入力してください');
+      return null;
+    }
+    if (_isMyself(recipientId)) {
+      _showError('自分自身には送金できません');
       return null;
     }
     setState(() => _isLookingUp = true);
@@ -216,10 +241,16 @@ class _TransferScreenState extends State<TransferScreen> {
                               setState(() => _verifiedRecipient = null);
                             }
                           },
-                          validator: (value) =>
-                              (value == null || value.trim().isEmpty)
-                                  ? '送金先のユーザーIDを入力してください'
-                                  : null,
+                          validator: (value) {
+                            final userId = value?.trim() ?? '';
+                            if (userId.isEmpty) {
+                              return '送金先のユーザーIDを入力してください';
+                            }
+                            if (_isMyself(userId)) {
+                              return '自分自身には送金できません';
+                            }
+                            return null;
+                          },
                         ),
                       ),
                       const SizedBox(width: 8),

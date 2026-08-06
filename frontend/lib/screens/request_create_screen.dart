@@ -30,6 +30,9 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
   bool _isLookingUp = false;
   bool _isCreating = false;
 
+  /// 自分自身への請求を送信前に弾くために保持する。
+  String? _myUserId;
+
   @override
   void initState() {
     super.initState();
@@ -38,6 +41,24 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
       _payerController.text = payer.userId;
       _verifiedPayer = payer;
     }
+    _loadMyUserId();
+  }
+
+  Future<void> _loadMyUserId() async {
+    try {
+      final profile = await ApiClient.instance.fetchProfile();
+      if (mounted) setState(() => _myUserId = profile.userId);
+    } on ApiException {
+      // 取得できなくてもサーバー側で弾かれるため、ここでは何もしない
+    }
+  }
+
+  /// 入力されたユーザーIDが自分自身かどうか。
+  /// ユーザーIDは大文字で扱われるため、比較時に揃える。
+  bool _isMyself(String userId) {
+    final myUserId = _myUserId;
+    return myUserId != null &&
+        userId.trim().toUpperCase() == myUserId.toUpperCase();
   }
 
   @override
@@ -76,6 +97,11 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
 
     if (payerId.isEmpty) {
       _showError('請求先のユーザーIDを入力してください');
+      return null;
+    }
+
+    if (_isMyself(payerId)) {
+      _showError('自分自身には請求できません');
       return null;
     }
 
@@ -238,8 +264,14 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
                             }
                           },
                           validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
+                            final userId = value?.trim() ?? '';
+
+                            if (userId.isEmpty) {
                               return '請求先のユーザーIDを入力してください';
+                            }
+
+                            if (_isMyself(userId)) {
+                              return '自分自身には請求できません';
                             }
 
                             return null;
