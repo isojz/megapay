@@ -188,10 +188,16 @@ class _TransferScreenState extends State<TransferScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _recipientController,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: '相手のユーザーID',
                             hintText: 'MP-12345678',
-                            border: OutlineInputBorder(),
+                            hintStyle: TextStyle(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant
+                                  .withValues(alpha: 0.45),
+                            ),
+                            border: const OutlineInputBorder(),
                           ),
                           onChanged: (_) {
                             if (_verifiedRecipient != null) {
