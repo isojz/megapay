@@ -322,13 +322,6 @@ class _BalanceTile extends StatelessWidget {
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
         ),
-        title: Text(
-          '¥',
-          style: Theme.of(context)
-              .textTheme
-              .titleLarge
-              ?.copyWith(fontSize: 19, fontWeight: FontWeight.bold),
-        ),
         trailing: Text(
           formatYen(balance.amount),
           style: Theme.of(context)
