@@ -34,7 +34,9 @@ class SplitGroupResult {
   const SplitGroupResult({
     required this.group,
     required this.amountPerPerson,
-    required this.extraAmount,
+    required this.extraPerPerson,
+    required this.extraExtraCount,
+    required this.organizerCount,
   });
 
   final SplitGroup group;
@@ -42,19 +44,49 @@ class SplitGroupResult {
   /// このグループの 1 人あたりの金額（割り振り単位で丸めた額）
   final int amountPerPerson;
 
-  /// 端数を引き受ける人が上乗せで負担する額。
-  /// 端数は重みがいちばん大きいグループの 1 人にまとめて寄せるため、
-  /// このグループが端数の引き受け先でなければ 0 になる。
-  final int extraAmount;
+  /// 端数をこのグループで調整する場合の 1 人あたりの増減額。
+  /// 四捨五入で足りなければプラス、集めすぎならマイナスになる。
+  /// 調整は重みがいちばん大きいグループの人たちで 1 円単位に分けるため、
+  /// このグループが調整先でなければ 0 になる。
+  final int extraPerPerson;
+
+  /// 上の調整をさらに 1 円だけ多く負担する人数（端数が人数で割り切れないとき）
+  final int extraExtraCount;
+
+  /// このグループに含まれる集金者の人数（0 か 1）
+  final int organizerCount;
+
+  /// 端数の調整が発生しているか（増額・減額どちらも含む）
+  bool get hasExtra => extraPerPerson != 0 || extraExtraCount != 0;
+
+  /// このグループの基本の 1 人あたり金額（端数の上乗せ込み）
+  int get amountWithExtra => amountPerPerson + extraPerPerson;
+
+  /// 端数を 1 円多く負担する人の金額
+  int get amountWithExtraPlusOne => amountWithExtra + 1;
+
+  /// グループ内で金額が 2 種類になるか（1 円差が出るか）
+  bool get hasOddYen => extraExtraCount > 0 && extraExtraCount < group.count;
+
+  /// 端数の調整で減額になっているか（四捨五入で集めすぎたとき）
+  bool get isDiscount => extraPerPerson < 0;
 
   /// このグループの合計金額
-  int get totalAmount => amountPerPerson * group.count + extraAmount;
+  int get totalAmount =>
+      (amountPerPerson + extraPerPerson) * group.count + extraExtraCount;
 
-  /// このグループに端数の引き受け役がいるか
-  bool get hasExtra => extraAmount > 0;
+  /// 集金者を除いた、実際に集金する人数
+  int get payerCount => group.count - organizerCount;
 
-  /// 端数を引き受ける人の金額
-  int get amountWithExtra => amountPerPerson + extraAmount;
+  /// 集金者が自分で負担する金額（集金者がいなければ 0）。
+  /// 端数の 1 円は集金者から先に引き受けるため、集金者がいる場合は多い方の額になる。
+  int get organizerAmount {
+    if (organizerCount == 0) return 0;
+    return extraExtraCount > 0 ? amountWithExtraPlusOne : amountWithExtra;
+  }
+
+  /// このグループから集金する金額（集金者の分を除く）
+  int get collectAmount => totalAmount - organizerAmount;
 }
 
 /// 傾斜配分の計算結果。
@@ -73,13 +105,29 @@ class SplitResult {
   /// 割り振りに使った単位（1 / 100 / 500 / 1000 円など）
   final int unit;
 
+  /// 集金者を含めた総人数
   int get totalCount =>
       groups.fold(0, (sum, result) => sum + result.group.count);
+
+  /// 集金者を除いた、実際に集金する人数
+  int get payerCount =>
+      groups.fold(0, (sum, result) => sum + result.payerCount);
+
+  /// 集金者が自分で負担する金額
+  int get organizerAmount =>
+      groups.fold(0, (sum, result) => sum + result.organizerAmount);
+
+  /// 実際に集金する金額（合計から集金者の自己負担を引いた額）
+  int get collectAmount => totalAmount - organizerAmount;
+
+  /// 集金者が割り勘に含まれているか
+  bool get includesOrganizer =>
+      groups.any((result) => result.organizerCount > 0);
 
   /// 端数の上乗せが発生しているか（発生していれば UI で補足を出す）
   bool get hasExtra => groups.any((result) => result.hasExtra);
 
-  /// 端数を引き受けたグループ（いなければ null）
+  /// 端数を負担したグループ（いなければ null）
   SplitGroupResult? get extraBearer {
     for (final result in groups) {
       if (result.hasExtra) return result;
@@ -96,7 +144,13 @@ class SplitResult {
 const splitUnits = <int>[1, 100, 500, 1000];
 
 /// 傾斜配分の入力が正しいかを判定する。問題がなければ null を返す。
-String? validateSplitGroups(List<SplitGroup> groups) {
+///
+/// [organizerGroupIndex] を渡すと、集金者を含めたうえで
+/// 「集金する相手が 1 人以上いるか」まで確認する。
+String? validateSplitGroups(
+  List<SplitGroup> groups, {
+  int? organizerGroupIndex,
+}) {
   if (groups.isEmpty) return 'グループを1つ以上追加してください';
   for (final group in groups) {
     if (group.name.trim().isEmpty) return 'グループ名を入力してください';
@@ -105,17 +159,29 @@ String? validateSplitGroups(List<SplitGroup> groups) {
   }
   final totalCount = groups.fold(0, (sum, group) => sum + group.count);
   if (totalCount < 2) return '合計人数は2人以上にしてください';
+  if (organizerGroupIndex != null) {
+    if (organizerGroupIndex < 0 || organizerGroupIndex >= groups.length) {
+      return '集金者のグループを選んでください';
+    }
+    // 集金者を除いた人数が 0 だと集金する相手がいない
+    if (totalCount - 1 < 1) return '集金する相手が1人以上必要です';
+  }
   return null;
 }
 
 /// 合計金額をグループの重みに応じて配分する。
 ///
-/// 1 人あたりの金額は「合計 × 重み ÷ 重み付き人数の合計」を [unit] 単位に切り捨てた額。
-/// 切り捨てで余った分（端数）は、重みがいちばん大きいグループの 1 人がまとめて負担する。
-/// これにより、ほとんどの人はきりのよい金額になり、配分後の合計は必ず [totalAmount] と一致する。
+/// 1 人あたりの金額は「合計 × 重み ÷ 重み付き人数の合計」を [unit] 単位に四捨五入した額。
+/// 500 円単位なら 249 円は切り捨てて 0 円に、250 円は切り上げて 500 円になる。
+/// 四捨五入で生じたずれ（足りない分・集めすぎた分）は、重みがいちばん大きいグループの
+/// 人たちで 1 円単位に分けて調整するため、配分後の合計は必ず [totalAmount] と一致する。
+///
+/// [organizerGroupIndex] に集金者が属するグループを指定すると、集金者もグループの人数に
+/// 含めて計算する（＝集金者の分だけ他の人の負担が軽くなる）。集金者は自分に請求しないため、
+/// 実際に集金するのは [SplitResult.collectAmount]。null なら集金者は割り勘に含めない。
 ///
 /// 例: 30,000 円 / 多め2人(重み2) + 少なめ3人(重み1) / 500 円単位
-///   多め   8,500 円（うち1人は 9,500 円）
+///   多め   9,000 円（端数 1,000 円を 2 人で 500 円ずつ負担）
 ///   少なめ 4,000 円
 ///   合計 30,000 円
 ///
@@ -124,6 +190,7 @@ SplitResult calculateWeightedSplit({
   required int totalAmount,
   required List<SplitGroup> groups,
   int unit = 1,
+  int? organizerGroupIndex,
 }) {
   if (totalAmount <= 0) {
     throw ArgumentError.value(totalAmount, 'totalAmount', '合計金額は1以上である必要があります');
@@ -133,6 +200,14 @@ SplitResult calculateWeightedSplit({
   }
   final error = validateSplitGroups(groups);
   if (error != null) throw ArgumentError(error);
+  if (organizerGroupIndex != null &&
+      (organizerGroupIndex < 0 || organizerGroupIndex >= groups.length)) {
+    throw ArgumentError.value(
+      organizerGroupIndex,
+      'organizerGroupIndex',
+      '集金者のグループ指定が範囲外です',
+    );
+  }
 
   // 重み付きの人数（例: 2人×2.0 + 3人×1.0 = 7.0）
   final weightedCount = groups.fold<double>(
@@ -140,25 +215,32 @@ SplitResult calculateWeightedSplit({
     (sum, group) => sum + group.count * group.weight,
   );
 
-  // 1. 各グループの 1 人あたりの金額を unit 単位に切り捨てる
+  // 1. 各グループの 1 人あたりの金額を unit 単位に四捨五入する
+  //    （500 円単位なら 249 円は 0 円、250 円は 500 円になる）
   final baseAmounts = groups.map((group) {
     final ideal = totalAmount * group.weight / weightedCount;
-    return (ideal / unit).floor() * unit;
+    return (ideal / unit).round() * unit;
   }).toList();
 
-  // 2. 切り捨てで足りない分（端数）を求める。切り捨てなので必ず 0 以上になる。
+  // 2. 四捨五入で生じたずれを求める。
+  //    足りなければプラス、集めすぎならマイナスになる。
   var assigned = 0;
   for (var i = 0; i < groups.length; i++) {
     assigned += baseAmounts[i] * groups[i].count;
   }
   final remainder = totalAmount - assigned;
 
-  // 3. 端数は重みがいちばん大きいグループの 1 人がまとめて引き受ける
+  // 3. ずれは重みがいちばん大きいグループの人たちで 1 円単位に分けて調整する
   //    （重みが同じなら先に並んでいるグループ）
   var topIndex = 0;
   for (var i = 1; i < groups.length; i++) {
     if (groups[i].weight > groups[topIndex].weight) topIndex = i;
   }
+  final topCount = groups[topIndex].count;
+  // マイナスでも正しく分けるため floor で求める（Dart の ~/ は 0 方向に丸めるため使わない）
+  final extraPerPerson = (remainder / topCount).floor();
+  // 均等に割れなかった 1 円は、そのグループの一部の人が引き受ける
+  final extraExtraCount = remainder - extraPerPerson * topCount;
 
   return SplitResult(
     groups: [
@@ -166,7 +248,9 @@ SplitResult calculateWeightedSplit({
         SplitGroupResult(
           group: groups[i],
           amountPerPerson: baseAmounts[i],
-          extraAmount: i == topIndex ? remainder : 0,
+          extraPerPerson: i == topIndex ? extraPerPerson : 0,
+          extraExtraCount: i == topIndex ? extraExtraCount : 0,
+          organizerCount: i == organizerGroupIndex ? 1 : 0,
         ),
     ],
     totalAmount: totalAmount,

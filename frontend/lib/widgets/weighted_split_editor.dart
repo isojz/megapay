@@ -17,6 +17,8 @@ class WeightedSplitEditor extends StatelessWidget {
     required this.onChanged,
     required this.unit,
     required this.onUnitChanged,
+    required this.organizerGroupIndex,
+    required this.onOrganizerGroupChanged,
   });
 
   final String currency;
@@ -30,6 +32,10 @@ class WeightedSplitEditor extends StatelessWidget {
   /// 割り振りの単位（1 / 100 / 500 / 1000 円）
   final int unit;
   final ValueChanged<int> onUnitChanged;
+
+  /// 集金者（自分）が属するグループ。null なら割り勘に加わらない。
+  final int? organizerGroupIndex;
+  final ValueChanged<int?> onOrganizerGroupChanged;
 
   void _updateAt(int index, SplitGroup group) {
     final next = [...groups];
@@ -87,13 +93,22 @@ class WeightedSplitEditor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final error = validateSplitGroups(groups);
+    // グループを減らしたときに範囲外を指さないようにする
+    final organizerIndex =
+        (organizerGroupIndex != null && organizerGroupIndex! < groups.length)
+            ? organizerGroupIndex
+            : null;
+    final error = validateSplitGroups(
+      groups,
+      organizerGroupIndex: organizerIndex,
+    );
     final amount = totalAmount;
     final result = (error == null && amount != null && amount > 0)
         ? calculateWeightedSplit(
             totalAmount: amount,
             groups: groups,
             unit: unit,
+            organizerGroupIndex: organizerIndex,
           )
         : null;
 
@@ -143,9 +158,40 @@ class WeightedSplitEditor extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 16),
+        Text('集金者（あなた）の扱い', style: theme.textTheme.titleMedium),
+        Text(
+          '割り勘に加わるグループを選ぶと、その分だけ他の人の負担が軽くなります。'
+          'あなた自身への請求は作られません',
+          style: theme.textTheme.bodySmall
+              ?.copyWith(color: theme.colorScheme.outline),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ChoiceChip(
+              selected: organizerIndex == null,
+              onSelected: (_) => onOrganizerGroupChanged(null),
+              label: const Text('加わらない'),
+            ),
+            for (var i = 0; i < groups.length; i++)
+              ChoiceChip(
+                selected: organizerIndex == i,
+                onSelected: (_) => onOrganizerGroupChanged(i),
+                label: Text(
+                  groups[i].name.trim().isEmpty
+                      ? 'グループ${i + 1}'
+                      : groups[i].name,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
         Text('割り振りの単位', style: theme.textTheme.titleMedium),
         Text(
-          'この単位できりよく割り振り、端数は重みがいちばん大きいグループの1人が負担します',
+          'この単位に四捨五入して割り振り、生じたずれは重みがいちばん大きいグループの'
+          '人たちで1円単位に調整します',
           style: theme.textTheme.bodySmall
               ?.copyWith(color: theme.colorScheme.outline),
         ),
@@ -430,7 +476,7 @@ class _ResultCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '支払い者 合計 ${result.totalCount} 人',
+                    '合計 ${result.totalCount} 人',
                     style: theme.textTheme.titleSmall,
                   ),
                 ),
@@ -441,6 +487,38 @@ class _ResultCard extends StatelessWidget {
                 ),
               ],
             ),
+            if (result.includesOrganizer) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'うち集金する分（${result.payerCount}人）',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                  Text(
+                    formatMoney(currency, result.collectAmount.toString()),
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'あなたの負担（請求は作られません）',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                  Text(
+                    formatMoney(currency, result.organizerAmount.toString()),
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ],
             if (result.hasZeroAmount) ...[
               const SizedBox(height: 8),
               Text(
@@ -451,8 +529,10 @@ class _ResultCard extends StatelessWidget {
             ] else if (result.hasExtra) ...[
               const SizedBox(height: 8),
               Text(
-                '端数 ${formatMoney(currency, result.extraBearer!.extraAmount.toString())} は'
-                '「${result.extraBearer!.group.name}」の1人が負担します（合計はぴったり一致します）',
+                '四捨五入で生じたずれは「${result.extraBearer!.group.name}」の'
+                '${result.extraBearer!.group.count}人で1円単位に'
+                '${result.extraBearer!.isDiscount ? '差し引いて' : '足して'}調整します'
+                '（合計はぴったり一致します）',
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.outline),
               ),
@@ -474,7 +554,8 @@ class _ResultRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final group = result.group;
-    final perPerson = formatMoney(currency, result.amountPerPerson.toString());
+    // 端数を分けた後の 1 人あたり金額を出す
+    final perPerson = formatMoney(currency, result.amountWithExtra.toString());
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -489,16 +570,17 @@ class _ResultRow extends StatelessWidget {
                     ?.copyWith(fontWeight: FontWeight.bold),
               ),
               Text(
-                '${group.count}人 × 重み ${_formatWeight(group.weight)}',
+                '${group.count}人 × 重み ${_formatWeight(group.weight)}'
+                '${result.organizerCount > 0 ? '（うちあなた1人）' : ''}',
                 style: theme.textTheme.bodySmall,
               ),
               Text('1人あたり $perPerson', style: theme.textTheme.bodySmall),
-              // 端数の引き受け役がいるグループだけ、その人の金額も出す
-              if (result.hasExtra)
+              // 端数が人数で割り切れず、1円だけ多い人がいる場合に補足する
+              if (result.hasOddYen)
                 Text(
-                  'うち1人は '
-                  '${formatMoney(currency, result.amountWithExtra.toString())}'
-                  '（端数を負担）',
+                  'うち${result.extraExtraCount}人は '
+                  '${formatMoney(currency, result.amountWithExtraPlusOne.toString())}'
+                  '（端数の1円）',
                   style: theme.textTheme.bodySmall
                       ?.copyWith(fontWeight: FontWeight.bold),
                 ),
