@@ -36,6 +36,10 @@ class MegaPayApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0D47A1)),
         useMaterial3: true,
+        // 同梱の日本語フォントを既定にする（pubspec.yaml の fonts 参照）。
+        // 指定しないと CanvasKit が gstatic からの遅延取得に頼り、
+        // 取得が終わるまで日本語が豆腐（□）になる。
+        fontFamily: 'NotoSansJP',
       ),
       home: rankedSplitCode != null && rankedSplitCode.isNotEmpty
           ? SplitBillLinkFlowScreen(
