@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
 import '../services/api_client.dart';
 import '../utils/money.dart';
+import '../utils/browser_url.dart';
 import '../widgets/payment_request_actions.dart';
 import '../widgets/transfer_tile.dart';
 import 'saved_users_screen.dart';
@@ -39,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    removeQueryParameter('split_code');
     _future = _load();
   }
 
