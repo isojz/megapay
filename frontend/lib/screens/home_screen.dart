@@ -108,6 +108,106 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _selectAvatar(Profile profile) async {
+    const avatarKeys = [
+      'avatar_01',
+      'avatar_02',
+      'avatar_03',
+      'avatar_04',
+      'avatar_05',
+      'avatar_06',
+    ];
+
+    final selectedAvatar = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('プロフィールアイコンを選択'),
+          content: SizedBox(
+            width: 320,
+            child: GridView.builder(
+              shrinkWrap: true,
+              itemCount: avatarKeys.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
+              itemBuilder: (context, index) {
+                final avatarKey = avatarKeys[index];
+                final selected = avatarKey == profile.avatarKey;
+
+                return InkWell(
+                  onTap: () => Navigator.of(dialogContext).pop(avatarKey),
+                  borderRadius: BorderRadius.circular(999),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        width: selected ? 3 : 1,
+                        color: selected
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.outlineVariant,
+                      ),
+                    ),
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/avatars/$avatarKey.png',
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('キャンセル'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (selectedAvatar == null || selectedAvatar == profile.avatarKey) {
+  return;
+}
+
+try {
+  final updatedProfile =
+      await ApiClient.instance.updateAvatar(selectedAvatar);
+
+  if (!mounted) return;
+
+  setState(() {
+    _future = _future.then(
+      (data) => _HomeData(
+        updatedProfile,
+        data.balances,
+        data.transfers,
+      ),
+    );
+  });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('プロフィールアイコンを変更しました'),
+        ),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message),
+        ),
+      );
+    }
+  }
+
   Future<void> _signOut() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -173,7 +273,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: EdgeInsets.fromLTRB(16, gap, 16, 96),
                   children: [
-                    _ProfileCard(profile: data.profile),
+                    _ProfileCard(
+                      profile: data.profile,
+                      onAvatarTap: () => _selectAvatar(data.profile),
+                    ),
                     SizedBox(height: gap),
                     Text('残高', style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 8),
@@ -225,9 +328,13 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _ProfileCard extends StatelessWidget {
-  const _ProfileCard({required this.profile});
+  const _ProfileCard({
+    required this.profile,
+    required this.onAvatarTap,
+  });
 
   final Profile profile;
+  final VoidCallback onAvatarTap;
 
   Future<void> _copyUserId(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
@@ -249,11 +356,32 @@ class _ProfileCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  child: Text(
-                    profile.displayName.isNotEmpty
-                        ? profile.displayName.characters.first
-                        : '?',
+                Tooltip(
+                  message: 'プロフィールアイコンを変更',
+                  child: InkWell(
+                    onTap: onAvatarTap,
+                    borderRadius: BorderRadius.circular(999),
+                    child: CircleAvatar(
+                      radius: 28,
+                      backgroundColor: theme.colorScheme.surface,
+                      child: ClipOval(
+                        child: Image.asset(
+                          'assets/avatars/${profile.avatarKey}.png',
+                          width: 56,
+                          height: 56,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Center(
+                              child: Text(
+                                profile.displayName.isNotEmpty
+                                    ? profile.displayName.characters.first
+                                    : '?',
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -266,7 +394,10 @@ class _ProfileCard extends StatelessWidget {
                         style: theme.textTheme.titleMedium
                             ?.copyWith(fontWeight: FontWeight.bold),
                       ),
-                      Text(profile.email, style: theme.textTheme.bodySmall),
+                      Text(
+                        profile.email,
+                        style: theme.textTheme.bodySmall,
+                      ),
                     ],
                   ),
                 ),
