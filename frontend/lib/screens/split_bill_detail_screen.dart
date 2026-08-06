@@ -63,7 +63,10 @@ class _SplitBillDetailScreenState extends State<SplitBillDetailScreen> {
 
   Future<void> _copyLink(SplitBill bill) async {
     final messenger = ScaffoldMessenger.of(context);
-    final link = buildSplitBillPaymentLink(bill.billCode);
+    final link = buildSplitBillPaymentLink(
+      bill.billCode,
+      ranked: bill.isRanked,
+    );
     await Clipboard.setData(ClipboardData(text: link));
     messenger.showSnackBar(
       const SnackBar(content: Text('支払いリンクをコピーしました')),
@@ -231,21 +234,33 @@ class _SummaryCard extends StatelessWidget {
             const Divider(height: 24),
             _SummaryRow(
               label: '1人あたり',
-              value: formatMoney(bill.currency, bill.shareAmount),
+              value: bill.isRanked
+                  ? 'ランク別'
+                  : formatMoney(bill.currency, bill.shareAmount),
               emphasize: true,
             ),
-            _SummaryRow(
-              label: '合計金額',
-              value: formatMoney(bill.currency, bill.totalAmount),
-            ),
+            if (!bill.isRanked)
+              _SummaryRow(
+                label: '合計金額',
+                value: formatMoney(bill.currency, bill.totalAmount),
+              ),
+            if (bill.isRanked)
+              ...bill.ranks.map(
+                (rank) => _SummaryRow(
+                  label: rank.label,
+                  value: formatMoney(bill.currency, rank.amount),
+                ),
+              ),
             _SummaryRow(
               label: '参加人数',
               value: '${bill.participantCount} 人（集金者を含む）',
             ),
             _SummaryRow(
               label: '集金済み',
-              value: '${formatMoney(bill.currency, bill.collectedAmount)}'
-                  ' / ${formatMoney(bill.currency, bill.expectedTotal)}',
+              value: bill.isRanked
+                  ? formatMoney(bill.currency, bill.collectedAmount)
+                  : '${formatMoney(bill.currency, bill.collectedAmount)}'
+                      ' / ${formatMoney(bill.currency, bill.expectedTotal)}',
             ),
             const SizedBox(height: 12),
             Row(
@@ -406,10 +421,12 @@ class _ParticipantTile extends StatelessWidget {
         ),
         subtitle: Text(
           paid && participant.paidAt != null
-              ? '${participant.userId}\n'
+              ? '${participant.userId}'
+                  '${participant.rankLabel == null ? '' : '・${participant.rankLabel}'}\n'
                   '${formatDateTime(participant.paidAt!)} に'
                   '${participant.isPaidByCash ? '現金で' : ''}支払い'
-              : participant.userId,
+              : '${participant.userId}'
+                  '${participant.rankLabel == null ? '' : '・${participant.rankLabel}'}',
         ),
         isThreeLine: paid && participant.paidAt != null,
         trailing: Column(

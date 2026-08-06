@@ -35,14 +35,15 @@ class PaymentRequestActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final density = _verticalDensity(context);
-    final divider = Divider(height: _lerp(6, 16, density));
+    final spacing = _sectionSpacing(context);
+    // 区切り線は置かず、余白だけでセクションを分ける。
+    // 見出し→ボタンと同じ値にして、ボタンの上下を均等にする。
+    final sectionGap = SizedBox(height: spacing);
     return Card(
+      // 既定の左右マージンを外して、使える幅をボタンに回す
+      margin: EdgeInsets.zero,
       child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: _lerp(8, 14, density),
-        ),
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: spacing),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -69,7 +70,7 @@ class PaymentRequestActions extends StatelessWidget {
                 ),
               ],
             ),
-            divider,
+            sectionGap,
             _ActionSection(
               title: '送金・出金',
               children: [
@@ -88,7 +89,7 @@ class PaymentRequestActions extends StatelessWidget {
                 ),
               ],
             ),
-            divider,
+            sectionGap,
             _ActionSection(
               title: '請求',
               children: [
@@ -118,7 +119,7 @@ class PaymentRequestActions extends StatelessWidget {
                 ),
               ],
             ),
-            divider,
+            sectionGap,
             _ActionSection(
               title: 'ユーザー',
               children: [
@@ -143,7 +144,11 @@ const double _itemSpacing = 8;
 const double _minItemWidth = 88;
 
 /// 広い画面でボタンが間延びしないようにする上限。
-const double _maxItemWidth = 112;
+const double _maxItemWidth = 132;
+
+/// 1 行に並べる最大数。最も項目が多いセクション（3 個）がちょうど 1 行に
+/// 収まるようにし、幅が余ったときは列を増やさずボタンを大きくする。
+const int _maxColumns = 3;
 
 /// 端末の高さから縦方向の詰め具合を求める（0 = 最も詰める / 1 = ゆったり）。
 ///
@@ -156,6 +161,13 @@ double _verticalDensity(BuildContext context) {
 
 double _lerp(double compact, double roomy, double t) =>
     compact + (roomy - compact) * t;
+
+/// 縦の余白はすべてこの値で統一する。
+///
+/// 見出し→ボタン と ボタン→次のセクション を同じ値にすることで、
+/// 区切り線がなくてもボタンの上下が均等に見えるようにしている。
+double _sectionSpacing(BuildContext context) =>
+    _lerp(6, 12, _verticalDensity(context));
 
 class _ActionSection extends StatelessWidget {
   const _ActionSection({
@@ -179,7 +191,7 @@ class _ActionSection extends StatelessWidget {
               .titleSmall
               ?.copyWith(fontWeight: FontWeight.bold),
         ),
-        SizedBox(height: _lerp(3, 8, density)),
+        SizedBox(height: _sectionSpacing(context)),
         // 幅を固定するとデバイスごとに余白が変わって行が不揃いになるため、
         // 実際に使える幅から列数を求め、余りが出ないように等分する。
         LayoutBuilder(
@@ -188,7 +200,7 @@ class _ActionSection extends StatelessWidget {
             final columns =
                 ((available + _itemSpacing) / (_minItemWidth + _itemSpacing))
                     .floor()
-                    .clamp(2, 8);
+                    .clamp(2, _maxColumns);
             // 下限は列数の計算側で担保済み。ここで下限を効かせると、
             // 極端に狭い画面のときに逆に幅が足りなくなるため上限だけを掛ける。
             final itemWidth =

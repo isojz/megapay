@@ -4,6 +4,7 @@ import '../models/models.dart';
 import '../services/api_client.dart';
 import 'request_create_screen.dart';
 import 'transfer_screen.dart';
+import '../utils/input_formatters.dart';
 
 class SavedUsersScreen extends StatefulWidget {
   const SavedUsersScreen({super.key, required this.balances});
@@ -153,17 +154,12 @@ class _SavedUsersScreenState extends State<SavedUsersScreen> {
                   Expanded(
                     child: TextField(
                       controller: _searchController,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'ユーザーID',
                         hintText: 'MP-12345678',
-                        hintStyle: TextStyle(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant
-                              .withValues(alpha: 0.45),
-                        ),
-                        border: const OutlineInputBorder(),
+                        border: OutlineInputBorder(),
                       ),
+                      inputFormatters: userIdInputFormatters,
                       onSubmitted: (_) => _search(),
                     ),
                   ),

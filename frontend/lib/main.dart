@@ -5,6 +5,7 @@ import 'config.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/split_bill_link_flow_screen.dart';
+import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,20 +29,51 @@ class MegaPayApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final splitCode = Uri.base.queryParameters['split_code']?.trim();
+    final rankedSplitCode =
+        Uri.base.queryParameters['ranked_split_code']?.trim();
+    final colorScheme = ColorScheme.fromSeed(seedColor: megaPayBrandColor);
     return MaterialApp(
       title: 'MegaPay',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0D47A1)),
+        colorScheme: colorScheme,
         useMaterial3: true,
         // 同梱の日本語フォントを既定にする（pubspec.yaml の fonts 参照）。
         // 指定しないと CanvasKit が gstatic からの遅延取得に頼り、
         // 取得が終わるまで日本語が豆腐（□）になる。
         fontFamily: 'NotoSansJP',
+        // カードを白のまま浮かせたいので、背景はグレーにする
+        scaffoldBackgroundColor: megaPayBackgroundColor,
+        // ヘッダーはイメージカラー。上に載る文字とアイコンは白で統一する
+        appBarTheme: const AppBarTheme(
+          backgroundColor: megaPayBrandColor,
+          foregroundColor: megaPayOnBrandColor,
+          elevation: 0,
+        ),
+        // タブは赤地に白だと選択中と未選択の区別が付きにくい。
+        // カードと同じ明るい面に載せ、文字色で選択状態を示す。
+        tabBarTheme: TabBarThemeData(
+          labelColor: megaPayBrandColor,
+          unselectedLabelColor: colorScheme.onSurfaceVariant,
+          indicatorColor: megaPayBrandColor,
+          dividerColor: Colors.transparent,
+        ),
+        // 入力例（hintText）は既定色だと入力済みの文字と紛らわしいため薄くする。
+        // 画面ごとに指定すると濃さがばらつくので、ここで一元管理する。
+        inputDecorationTheme: InputDecorationTheme(
+          hintStyle: TextStyle(
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
+          ),
+        ),
       ),
-      home: splitCode != null && splitCode.isNotEmpty
-          ? SplitBillLinkFlowScreen(billCode: splitCode)
-          : const AuthGate(),
+      home: rankedSplitCode != null && rankedSplitCode.isNotEmpty
+          ? SplitBillLinkFlowScreen(
+              billCode: rankedSplitCode,
+              ranked: true,
+            )
+          : splitCode != null && splitCode.isNotEmpty
+              ? SplitBillLinkFlowScreen(billCode: splitCode)
+              : const AuthGate(),
     );
   }
 }

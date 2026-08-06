@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
 import '../services/api_client.dart';
+import '../theme.dart';
 import '../utils/money.dart';
 import '../utils/browser_url.dart';
 import '../widgets/payment_request_actions.dart';
@@ -41,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     removeQueryParameter('split_code');
+    removeQueryParameter('ranked_split_code');
     _future = _load();
   }
 
@@ -236,7 +238,26 @@ try {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('MegaPay'),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.currency_exchange,
+              size: 28,
+              color: megaPayOnBrandColor,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'MegaPay',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: megaPayOnBrandColor,
+                    fontFamily: 'NotoSansJP',
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.3,
+                  ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             tooltip: 'ログアウト',
@@ -260,32 +281,35 @@ try {
           final data = snapshot.data!;
           // 画面が低い端末ではセクション間の余白を詰め、
           // メニュー（ユーザー一覧まで）が一画面に収まりやすいようにする。
-          final gap = ((MediaQuery.sizeOf(context).height - 640) / 260)
-                      .clamp(0.0, 1.0) *
-                  12 +
-              12;
+          final density =
+              ((MediaQuery.sizeOf(context).height - 640) / 260).clamp(0.0, 1.0);
+          // アカウント〜残高〜メニューは続けて見せたいので詰める
+          final tightGap = 8 + density * 6;
+          // 履歴は別のまとまりなので少し離す
+          final gap = 12 + density * 12;
           return RefreshIndicator(
             onRefresh: _reload,
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
+                constraints: const BoxConstraints(maxWidth: 560),
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.fromLTRB(16, gap, 16, 96),
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
                   children: [
                     _ProfileCard(
                       profile: data.profile,
                       onAvatarTap: () => _selectAvatar(data.profile),
                     ),
-                    SizedBox(height: gap),
+                    SizedBox(height: tightgap),
+
                     Text('残高', style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     ...data.balances.map((b) => _BalanceTile(balance: b)),
                     if (data.balances.isEmpty)
                       const Card(
                         child: ListTile(title: Text('残高がありません')),
                       ),
-                    SizedBox(height: gap),
+                    SizedBox(height: tightGap),
                     PaymentRequestActions(
                       balances: data.balances,
                       onChanged: _reload,
@@ -435,29 +459,38 @@ class _ProfileCard extends StatelessWidget {
   }
 }
 
-class _BalanceTile extends StatelessWidget {
+class _BalanceTile extends StatefulWidget {
   const _BalanceTile({required this.balance});
 
   final Balance balance;
 
   @override
+  State<_BalanceTile> createState() => _BalanceTileState();
+}
+
+class _BalanceTileState extends State<_BalanceTile> {
+  /// 人に見られないよう既定では伏せ、目のボタンで表示を切り替える。
+  bool _visible = false;
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Card(
       child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-          child: Text(
-            balance.currency.substring(0, 1),
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
-        title: Text(balance.currency),
-        trailing: Text(
-          formatMoney(balance.currency, balance.amount),
-          style: Theme.of(context)
-              .textTheme
-              .titleMedium
+        // 金額は title に置いて左揃えにし、目のボタンを trailing（右）に置く
+        title: Text(
+          _visible ? formatYen(widget.balance.amount) : '•••••• 円',
+          style: theme.textTheme.headlineMedium
               ?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        trailing: IconButton(
+          tooltip: _visible ? '残高を隠す' : '残高を表示',
+          icon: Icon(
+            _visible
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
+          ),
+          onPressed: () => setState(() => _visible = !_visible),
         ),
       ),
     );

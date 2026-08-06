@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_client.dart';
 import '../utils/money.dart';
+import '../widgets/saved_user_picker.dart';
+import '../utils/input_formatters.dart';
 
 /// 送金画面：宛先（ユーザーID）と日本円の金額を指定して送金する。
 class TransferScreen extends StatefulWidget {
@@ -31,6 +33,9 @@ class _TransferScreenState extends State<TransferScreen> {
   bool _isLookingUp = false;
   bool _isSending = false;
 
+  /// 自分自身への送金を送信前に弾くために保持する。
+  String? _myUserId;
+
   @override
   void initState() {
     super.initState();
@@ -39,6 +44,24 @@ class _TransferScreenState extends State<TransferScreen> {
       _recipientController.text = recipient.userId;
       _verifiedRecipient = recipient;
     }
+    _loadMyUserId();
+  }
+
+  Future<void> _loadMyUserId() async {
+    try {
+      final profile = await ApiClient.instance.fetchProfile();
+      if (mounted) setState(() => _myUserId = profile.userId);
+    } on ApiException {
+      // 取得できなくてもサーバー側で弾かれるため、ここでは何もしない
+    }
+  }
+
+  /// 入力されたユーザーIDが自分自身かどうか。
+  /// ユーザーIDは大文字で扱われるため、比較時に揃える。
+  bool _isMyself(String userId) {
+    final myUserId = _myUserId;
+    return myUserId != null &&
+        userId.trim().toUpperCase() == myUserId.toUpperCase();
   }
 
   @override
@@ -66,11 +89,26 @@ class _TransferScreenState extends State<TransferScreen> {
     );
   }
 
+  /// ユーザー一覧から宛先を選ぶ。保存済みユーザーは表示名も分かっているため、
+  /// 選んだ時点で確認済みとして扱う。
+  Future<void> _pickFromSavedUsers() async {
+    final picked = await SavedUserPicker.show(context);
+    if (picked == null || !mounted) return;
+    setState(() {
+      _recipientController.text = picked.userId;
+      _verifiedRecipient = picked;
+    });
+  }
+
   /// 宛先IDから相手を検索して表示名を確認する。
   Future<RecipientInfo?> _lookupRecipient() async {
     final recipientId = _recipientController.text.trim();
     if (recipientId.isEmpty) {
       _showError('送金先のユーザーIDを入力してください');
+      return null;
+    }
+    if (_isMyself(recipientId)) {
+      _showError('自分自身には送金できません');
       return null;
     }
     setState(() => _isLookingUp = true);
@@ -188,26 +226,27 @@ class _TransferScreenState extends State<TransferScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _recipientController,
-                          decoration: InputDecoration(
+                          decoration: const InputDecoration(
                             labelText: '相手のユーザーID',
                             hintText: 'MP-12345678',
-                            hintStyle: TextStyle(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant
-                                  .withValues(alpha: 0.45),
-                            ),
-                            border: const OutlineInputBorder(),
+                            border: OutlineInputBorder(),
                           ),
+                          inputFormatters: userIdInputFormatters,
                           onChanged: (_) {
                             if (_verifiedRecipient != null) {
                               setState(() => _verifiedRecipient = null);
                             }
                           },
-                          validator: (value) =>
-                              (value == null || value.trim().isEmpty)
-                                  ? '送金先のユーザーIDを入力してください'
-                                  : null,
+                          validator: (value) {
+                            final userId = value?.trim() ?? '';
+                            if (userId.isEmpty) {
+                              return '送金先のユーザーIDを入力してください';
+                            }
+                            if (_isMyself(userId)) {
+                              return '自分自身には送金できません';
+                            }
+                            return null;
+                          },
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -227,8 +266,15 @@ class _TransferScreenState extends State<TransferScreen> {
                       ),
                     ],
                   ),
-                  if (_verifiedRecipient != null) ...[
-                    const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _pickFromSavedUsers,
+                      icon: const Icon(Icons.people_outline),
+                      label: const Text('ユーザー一覧から選ぶ'),
+                    ),
+                  ),
+                  if (_verifiedRecipient != null)
                     Card(
                       color: Colors.green.shade50,
                       child: ListTile(
@@ -238,7 +284,6 @@ class _TransferScreenState extends State<TransferScreen> {
                         subtitle: Text(_verifiedRecipient!.userId),
                       ),
                     ),
-                  ],
                   const SizedBox(height: 24),
                   Text('金額', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
@@ -255,10 +300,10 @@ class _TransferScreenState extends State<TransferScreen> {
                     controller: _amountController,
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: decimalAmountInputFormatters,
                     decoration: const InputDecoration(
                       labelText: '送金金額',
-                      prefixText: '¥ ',
-                      suffixText: 'JPY',
+                      suffixText: '円',
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
