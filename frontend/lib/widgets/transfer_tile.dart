@@ -37,18 +37,21 @@ class TransferTile extends StatelessWidget {
         ),
         isThreeLine: true,
         trailing: Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
               '$sign${formatMoney(record.currency, record.amount)}',
+              maxLines: 1,
               style: theme.textTheme.titleSmall
                   ?.copyWith(fontWeight: FontWeight.bold, color: color),
             ),
             SizedBox(
-              height: 28,
+              height: 24,
               child: IconButton(
                 padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
                 tooltip: 'ユーザーを保存',
                 onPressed: onSave,
                 icon: const Icon(Icons.bookmark_add_outlined, size: 20),

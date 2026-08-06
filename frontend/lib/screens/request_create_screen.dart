@@ -299,8 +299,7 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
                     ),
                     decoration: const InputDecoration(
                       labelText: '請求金額',
-                      prefixText: '¥ ',
-                      suffixText: 'JPY',
+                      suffixText: '円',
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {

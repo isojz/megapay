@@ -128,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    '手軽に、どの通貨でも送金',
+                    'いつでもどこでも手軽に割り勘',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
