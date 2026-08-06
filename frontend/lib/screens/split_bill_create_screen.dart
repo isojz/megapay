@@ -47,6 +47,9 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
     SplitGroup(name: '少なめに払う人', count: 1, weight: 1.0),
   ];
 
+  /// 割り振りの単位。きりのよい金額にしやすいよう既定を 500 円にする。
+  int _unit = 500;
+
   /// 合計金額の入力欄の現在値（傾斜の割り振り表示に使う）
   int? get _enteredAmount => int.tryParse(_amountController.text.trim());
 
@@ -136,7 +139,11 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
     }
 
     final title = _titleController.text.trim();
-    final result = calculateWeightedSplit(totalAmount: amount, groups: _groups);
+    final result = calculateWeightedSplit(
+      totalAmount: amount,
+      groups: _groups,
+      unit: _unit,
+    );
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -295,6 +302,8 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                       totalAmount: _enteredAmount,
                       groups: _groups,
                       onChanged: (groups) => setState(() => _groups = groups),
+                      unit: _unit,
+                      onUnitChanged: (unit) => setState(() => _unit = unit),
                     ),
                   const SizedBox(height: 24),
                   FilledButton.icon(

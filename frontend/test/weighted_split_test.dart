@@ -8,8 +8,19 @@ void expectTotalMatches(SplitResult result, int expected) {
   expect(result.totalAmount, expected);
 }
 
+/// 端数を引き受ける1人を除き、全員の金額が単位で割り切れることを確かめる。
+void expectAmountsFitUnit(SplitResult result) {
+  for (final group in result.groups) {
+    expect(
+      group.amountPerPerson % result.unit,
+      0,
+      reason: '${group.group.name} の1人あたり金額が単位で割り切れていません',
+    );
+  }
+}
+
 void main() {
-  group('calculateWeightedSplit', () {
+  group('calculateWeightedSplit（1円単位）', () {
     test('割り切れる場合はグループ内が同額になる', () {
       final result = calculateWeightedSplit(
         totalAmount: 10000,
@@ -21,7 +32,7 @@ void main() {
       // 重み付き人数 = 1×2 + 2×1 = 4 → 1重みあたり 2500 円
       expect(result.groups[0].amountPerPerson, 5000);
       expect(result.groups[1].amountPerPerson, 2500);
-      expect(result.hasRounding, isFalse);
+      expect(result.hasExtra, isFalse);
       expectTotalMatches(result, 10000);
     });
 
@@ -36,7 +47,7 @@ void main() {
       expectTotalMatches(result, 10000);
     });
 
-    test('端数は重みの大きいグループから割り当てられる', () {
+    test('端数は重みがいちばん大きいグループの1人がまとめて負担する', () {
       final result = calculateWeightedSplit(
         totalAmount: 10001,
         groups: const [
@@ -44,33 +55,11 @@ void main() {
           SplitGroup(name: '重い', count: 2, weight: 2),
         ],
       );
-      // 端数は重みの大きい「重い」グループが先に負担する
-      expect(result.groups[1].extraPersonCount, greaterThan(0));
+      // 端数は「重い」グループだけに乗る
+      expect(result.groups[0].extraAmount, 0);
+      expect(result.groups[1].extraAmount, greaterThan(0));
+      expect(result.extraBearer?.group.name, '重い');
       expectTotalMatches(result, 10001);
-    });
-
-    test('等分（全員同じ重み）でも合計が一致する', () {
-      final result = calculateWeightedSplit(
-        totalAmount: 10000,
-        groups: const [SplitGroup(name: '全員', count: 3, weight: 1)],
-      );
-      expect(result.groups[0].amountPerPerson, 3333);
-      expect(result.groups[0].extraPersonCount, 1); // 端数1円を1人が負担
-      expectTotalMatches(result, 10000);
-    });
-
-    test('重みを変えても合計は変わらない', () {
-      const groups = [
-        SplitGroup(name: 'A', count: 2, weight: 1),
-        SplitGroup(name: 'B', count: 3, weight: 1),
-      ];
-      for (final weight in [1.0, 1.5, 2.0, 2.5, 3.0]) {
-        final result = calculateWeightedSplit(
-          totalAmount: 12345,
-          groups: [groups[0].copyWith(weight: weight), groups[1]],
-        );
-        expectTotalMatches(result, 12345);
-      }
     });
 
     test('重みが大きいグループの方が1人あたり高くなる', () {
@@ -88,6 +77,19 @@ void main() {
       expectTotalMatches(result, 30000);
     });
 
+    test('重みを変えても合計は変わらない', () {
+      for (final weight in [1.0, 1.5, 2.0, 2.5, 3.0]) {
+        final result = calculateWeightedSplit(
+          totalAmount: 12345,
+          groups: [
+            SplitGroup(name: 'A', count: 2, weight: weight),
+            const SplitGroup(name: 'B', count: 3, weight: 1),
+          ],
+        );
+        expectTotalMatches(result, 12345);
+      }
+    });
+
     test('グループ数が3つ以上でも合計が一致する', () {
       final result = calculateWeightedSplit(
         totalAmount: 9999,
@@ -101,31 +103,114 @@ void main() {
       expect(result.totalCount, 10);
       expectTotalMatches(result, 9999);
     });
+  });
 
-    test('端数が出やすい金額でも常に一致する（総当たり）', () {
-      for (var amount = 1000; amount <= 1100; amount++) {
+  group('calculateWeightedSplit（単位あり）', () {
+    test('500円単位で割り振り、端数は上のグループの1人が負担する', () {
+      final result = calculateWeightedSplit(
+        totalAmount: 30000,
+        unit: 500,
+        groups: const [
+          SplitGroup(name: '多め', count: 2, weight: 2),
+          SplitGroup(name: '少なめ', count: 3, weight: 1),
+        ],
+      );
+      // 重み付き人数 = 2×2 + 3×1 = 7
+      //   多め   30000×2/7 = 8571.4 → 8500（500円単位）
+      //   少なめ 30000×1/7 = 4285.7 → 4000
+      //   割当 = 8500×2 + 4000×3 = 29000、端数 1000 は多めの1人が負担
+      expect(result.groups[0].amountPerPerson, 8500);
+      expect(result.groups[1].amountPerPerson, 4000);
+      expect(result.groups[0].extraAmount, 1000);
+      expect(result.groups[0].amountWithExtra, 9500);
+      expect(result.groups[1].extraAmount, 0);
+      expectTotalMatches(result, 30000);
+      expectAmountsFitUnit(result);
+    });
+
+    test('1000円単位でも合計が一致する', () {
+      final result = calculateWeightedSplit(
+        totalAmount: 50000,
+        unit: 1000,
+        groups: const [
+          SplitGroup(name: '先輩', count: 3, weight: 2),
+          SplitGroup(name: '後輩', count: 5, weight: 1),
+        ],
+      );
+      expectTotalMatches(result, 50000);
+      expectAmountsFitUnit(result);
+    });
+
+    test('100円単位でも合計が一致する', () {
+      final result = calculateWeightedSplit(
+        totalAmount: 17800,
+        unit: 100,
+        groups: const [
+          SplitGroup(name: 'A', count: 2, weight: 1.5),
+          SplitGroup(name: 'B', count: 4, weight: 1),
+        ],
+      );
+      expectTotalMatches(result, 17800);
+      expectAmountsFitUnit(result);
+    });
+
+    test('合計が単位で割り切れなくても、端数を引き受けて合計は一致する', () {
+      final result = calculateWeightedSplit(
+        totalAmount: 30300,
+        unit: 500,
+        groups: const [
+          SplitGroup(name: '多め', count: 2, weight: 2),
+          SplitGroup(name: '少なめ', count: 3, weight: 1),
+        ],
+      );
+      // 端数を引き受ける1人だけは単位で割り切れない額になりうる
+      expectTotalMatches(result, 30300);
+      expectAmountsFitUnit(result);
+      expect(result.extraBearer?.group.name, '多め');
+    });
+
+    test('端数を引き受ける以外の全員は単位どおりの金額になる（総当たり）', () {
+      for (var amount = 20000; amount <= 20100; amount++) {
         final result = calculateWeightedSplit(
           totalAmount: amount,
+          unit: 500,
           groups: const [
             SplitGroup(name: 'A', count: 3, weight: 1.7),
             SplitGroup(name: 'B', count: 4, weight: 1.0),
           ],
         );
         expectTotalMatches(result, amount);
+        expectAmountsFitUnit(result);
       }
     });
 
-    test('小数の重みでも合計が一致する', () {
+    test('単位が大きすぎると0円のグループが出ることを検知できる', () {
       final result = calculateWeightedSplit(
-        totalAmount: 7777,
+        totalAmount: 3000,
+        unit: 1000,
         groups: const [
-          SplitGroup(name: 'A', count: 2, weight: 1.33),
-          SplitGroup(name: 'B', count: 3, weight: 0.77),
+          SplitGroup(name: '多め', count: 1, weight: 3),
+          SplitGroup(name: '少なめ', count: 5, weight: 1),
         ],
       );
-      expectTotalMatches(result, 7777);
+      // 少なめの理想額は 3000×1/8 = 375 円 → 1000 円単位では 0 円になる
+      expect(result.hasZeroAmount, isTrue);
+      expectTotalMatches(result, 3000);
     });
 
+    test('単位に0以下は指定できない', () {
+      expect(
+        () => calculateWeightedSplit(
+          totalAmount: 1000,
+          unit: 0,
+          groups: const [SplitGroup(name: 'A', count: 2, weight: 1)],
+        ),
+        throwsArgumentError,
+      );
+    });
+  });
+
+  group('入力チェック', () {
     test('不正な入力は例外になる', () {
       expect(
         () => calculateWeightedSplit(
@@ -146,10 +231,8 @@ void main() {
         throwsArgumentError,
       );
     });
-  });
 
-  group('validateSplitGroups', () {
-    test('正しい入力は null を返す', () {
+    test('validateSplitGroups は正しい入力に null を返す', () {
       expect(
         validateSplitGroups(const [
           SplitGroup(name: 'A', count: 1, weight: 1),
@@ -159,7 +242,7 @@ void main() {
       );
     });
 
-    test('空・名前なし・人数0・重み0 はメッセージを返す', () {
+    test('validateSplitGroups は空・名前なし・人数0・重み0 を弾く', () {
       expect(validateSplitGroups(const []), isNotNull);
       expect(
         validateSplitGroups(const [SplitGroup(name: '  ', count: 2, weight: 1)]),
@@ -175,7 +258,7 @@ void main() {
       );
     });
 
-    test('合計1人だけの場合はメッセージを返す', () {
+    test('合計1人だけの場合は弾く', () {
       expect(
         validateSplitGroups(const [SplitGroup(name: 'A', count: 1, weight: 1)]),
         isNotNull,
@@ -184,16 +267,20 @@ void main() {
   });
 
   group('splitPresets', () {
-    test('すべてのプリセットが計算できる', () {
+    test('すべてのプリセットが各単位で計算できる', () {
       for (final preset in splitPresets) {
-        // プリセットは人数1人ずつなので、人数を足して現実的な構成にする
-        final groups = preset.groups
-            .map((g) => g.copyWith(count: g.count + 1))
-            .toList();
+        final groups =
+            preset.groups.map((g) => g.copyWith(count: g.count + 1)).toList();
         expect(validateSplitGroups(groups), isNull, reason: preset.label);
-        final result =
-            calculateWeightedSplit(totalAmount: 20000, groups: groups);
-        expectTotalMatches(result, 20000);
+        for (final unit in splitUnits) {
+          final result = calculateWeightedSplit(
+            totalAmount: 20000,
+            unit: unit,
+            groups: groups,
+          );
+          expectTotalMatches(result, 20000);
+          expectAmountsFitUnit(result);
+        }
       }
     });
   });
