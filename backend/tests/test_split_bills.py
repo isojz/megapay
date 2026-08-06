@@ -307,3 +307,50 @@ def test_list_my_split_bills(client, monkeypatch):
 def test_list_my_split_bills_rejects_bad_limit(client):
     assert client.get(f"{BASE}?limit=0").status_code == 422
     assert client.get(f"{BASE}?limit=999").status_code == 422
+
+
+def test_create_ranked_split_bill_test(client, monkeypatch):
+    captured = {}
+
+    def fake_create(token, title, participant_count):
+        captured.update(title=title, participant_count=participant_count)
+        return _bill_json(
+            bill_code="SR-ABCD2345",
+            allocation_mode="ranked",
+            ranks=[
+                {"rank_code": "A", "label": "Aランク", "amount": "5000", "display_order": 1},
+                {"rank_code": "B", "label": "Bランク", "amount": "3000", "display_order": 2},
+                {"rank_code": "C", "label": "Cランク", "amount": "1000", "display_order": 3},
+            ],
+        )
+
+    monkeypatch.setattr(db, "create_ranked_split_bill_test", fake_create)
+    res = client.post(
+        f"{BASE}/ranked-test",
+        json={"title": " ランク会 ", "participant_count": 5},
+    )
+    assert res.status_code == 201
+    assert captured == {"title": "ランク会", "participant_count": 5}
+    assert res.json()["bill_code"].startswith("SR-")
+    assert [rank["amount"] for rank in res.json()["ranks"]] == ["5000", "3000", "1000"]
+
+
+def test_join_ranked_split_bill(client, monkeypatch):
+    captured = {}
+
+    def fake_join(token, code, rank_code):
+        captured.update(code=code, rank_code=rank_code)
+        return _bill_json(
+            bill_code=code,
+            allocation_mode="ranked",
+            joined=True,
+            my_request_code="RQ-RANK1234",
+        )
+
+    monkeypatch.setattr(db, "join_ranked_split_bill", fake_join)
+    res = client.post(
+        f"{BASE}/SR-ABCD2345/join-ranked", json={"rank_code": " A "}
+    )
+    assert res.status_code == 200
+    assert captured == {"code": "SR-ABCD2345", "rank_code": "A"}
+    assert res.json()["my_request_code"] == "RQ-RANK1234"

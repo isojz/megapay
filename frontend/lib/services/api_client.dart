@@ -174,6 +174,17 @@ class ApiClient {
         }) as Map<String, dynamic>,
       );
 
+  Future<SplitBill> createRankedSplitBillTest({
+    required String title,
+    required int participantCount,
+  }) async =>
+      SplitBill.fromJson(
+        await _post('/api/v1/split-bills/ranked-test', {
+          'title': title,
+          'participant_count': participantCount,
+        }) as Map<String, dynamic>,
+      );
+
   /// 割り勘リンク用の限定情報を取得する（ログイン不要）
   Future<PublicSplitBill> lookupPublicSplitBill(String billCode) async =>
       PublicSplitBill.fromJson(
@@ -194,6 +205,17 @@ class ApiClient {
         await _post(
           '/api/v1/split-bills/${Uri.encodeComponent(billCode)}/join',
           const {},
+        ) as Map<String, dynamic>,
+      );
+
+  Future<SplitBill> joinRankedSplitBill(
+    String billCode,
+    String rankCode,
+  ) async =>
+      SplitBill.fromJson(
+        await _post(
+          '/api/v1/split-bills/${Uri.encodeComponent(billCode)}/join-ranked',
+          {'rank_code': rankCode},
         ) as Map<String, dynamic>,
       );
 

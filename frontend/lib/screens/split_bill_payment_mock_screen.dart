@@ -56,6 +56,7 @@ class _SplitBillPaymentMockScreenState
 
   Future<void> _goHome() async {
     removeQueryParameter('split_code');
+    removeQueryParameter('ranked_split_code');
     await Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const HomeScreen()),
       (route) => false,

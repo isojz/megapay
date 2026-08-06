@@ -17,6 +17,7 @@ _DB_ERROR_MAP: dict[str, tuple[int, str]] = {
     # 割り勘機能
     "SPLIT_BILL_NOT_FOUND": (status.HTTP_404_NOT_FOUND, "請求コードが見つかりません"),
     "SPLIT_BILL_FULL": (status.HTTP_409_CONFLICT, "参加人数の上限に達しています"),
+    "INVALID_SPLIT_BILL_RANK": (status.HTTP_400_BAD_REQUEST, "支払いランクが不正です"),
     "ORGANIZER_CANNOT_JOIN": (status.HTTP_400_BAD_REQUEST, "集金者はグループに参加できません"),
     "INVALID_PARTICIPANT_COUNT": (status.HTTP_400_BAD_REQUEST, "参加人数が不正です"),
     "INVALID_TITLE": (status.HTTP_400_BAD_REQUEST, "イベント名を入力してください"),

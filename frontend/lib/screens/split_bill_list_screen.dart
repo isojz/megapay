@@ -206,7 +206,9 @@ class _SplitBillTile extends StatelessWidget {
         subtitle: Text(
           [
             bill.isOrganizer ? '集金者: あなた' : '集金者: ${bill.organizerName} さん',
-            '1人あたり ${formatMoney(bill.currency, bill.shareAmount)}',
+            bill.isRanked
+                ? 'ランク別の支払い金額'
+                : '1人あたり ${formatMoney(bill.currency, bill.shareAmount)}',
             formatDateTime(bill.createdAt),
           ].join('\n'),
         ),

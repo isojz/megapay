@@ -121,6 +121,36 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
     }
   }
 
+  Future<void> _createRankedTest() async {
+    final count = int.tryParse(_countController.text.trim());
+    if (count == null || count < 2 || count > _maxParticipants) {
+      _showError('参加人数は2〜$_maxParticipants人で入力してください');
+      return;
+    }
+    final title = _titleController.text.trim();
+    setState(() => _isCreating = true);
+    try {
+      final bill = await ApiClient.instance.createRankedSplitBillTest(
+        title: title.isEmpty ? 'ランク別割り勘（テスト）' : title,
+        participantCount: count,
+      );
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => _SplitBillCreatedDialog(bill: bill),
+      );
+      if (!mounted) return;
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => SplitBillDetailScreen(billCode: bill.billCode),
+        ),
+      );
+    } on ApiException catch (err) {
+      _showError(err.message);
+    } finally {
+      if (mounted) setState(() => _isCreating = false);
+    }
+  }
   /// 傾斜つきの割り勘を作成する。
   ///
   /// 割り振りの計算はこの画面（フロント）で完結している。
@@ -320,6 +350,20 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                         : const Icon(Icons.call_split),
                     label: const Text('割り勘を作成'),
                   ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _isCreating ? null : _createRankedTest,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    icon: const Icon(Icons.workspace_premium_outlined),
+                    label: const Text('ランクごとのリンク作成（テスト）'),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'テスト設定: Aランク 5,000円 / Bランク 3,000円 / Cランク 1,000円',
+                    textAlign: TextAlign.center,
+                  ),
                 ],
               ),
             ),
@@ -344,7 +388,10 @@ class _SplitBillCreatedDialog extends StatelessWidget {
     );
   }
 
-  String get _paymentLink => buildSplitBillPaymentLink(bill.billCode);
+  String get _paymentLink => buildSplitBillPaymentLink(
+        bill.billCode,
+        ranked: bill.isRanked,
+      );
 
   Future<void> _copyLink(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
@@ -365,15 +412,23 @@ class _SplitBillCreatedDialog extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            '${bill.title}\n'
-            '合計 ${formatMoney(bill.currency, bill.totalAmount)} を'
-            '${bill.participantCount}人で割り勘します。',
+            bill.isRanked
+                ? '${bill.title}\n${bill.participantCount}人・ランク別割り勘'
+                : '${bill.title}\n'
+                    '合計 ${formatMoney(bill.currency, bill.totalAmount)} を'
+                    '${bill.participantCount}人で割り勘します。',
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
-          Text('1人あたり', style: theme.textTheme.bodySmall),
+          Text(bill.isRanked ? '支払いランク' : '1人あたり',
+              style: theme.textTheme.bodySmall),
           Text(
-            formatMoney(bill.currency, bill.shareAmount),
+            bill.isRanked
+                ? bill.ranks
+                    .map((rank) =>
+                        '${rank.label} ${formatMoney(bill.currency, rank.amount)}')
+                    .join(' / ')
+                : formatMoney(bill.currency, bill.shareAmount),
             style: theme.textTheme.headlineSmall
                 ?.copyWith(fontWeight: FontWeight.bold),
           ),

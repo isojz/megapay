@@ -18,6 +18,7 @@ class _JoinSplitBillScreenState extends State<JoinSplitBillScreen> {
   final _codeController = TextEditingController();
 
   SplitBill? _bill;
+  SplitBillRank? _selectedRank;
   bool _isLookingUp = false;
   bool _isJoining = false;
 
@@ -46,7 +47,12 @@ class _JoinSplitBillScreenState extends State<JoinSplitBillScreen> {
     setState(() => _isLookingUp = true);
     try {
       final bill = await ApiClient.instance.lookupSplitBill(code);
-      if (mounted) setState(() => _bill = bill);
+      if (mounted) {
+        setState(() {
+          _bill = bill;
+          _selectedRank = null;
+        });
+      }
     } on ApiException catch (err) {
       if (mounted) setState(() => _bill = null);
       _showError(err.message);
@@ -58,6 +64,12 @@ class _JoinSplitBillScreenState extends State<JoinSplitBillScreen> {
   Future<void> _join() async {
     final bill = _bill;
     if (bill == null) return;
+    if (bill.isRanked && _selectedRank == null) {
+      _showError('支払いランクを選択してください');
+      return;
+    }
+    final paymentAmount =
+        bill.isRanked ? _selectedRank!.amount : bill.shareAmount;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -70,7 +82,7 @@ class _JoinSplitBillScreenState extends State<JoinSplitBillScreen> {
             Text('「${bill.title}」に参加します。'),
             const SizedBox(height: 8),
             Text(
-              formatMoney(bill.currency, bill.shareAmount),
+              formatMoney(bill.currency, paymentAmount),
               style: Theme.of(context)
                   .textTheme
                   .headlineSmall
@@ -78,7 +90,9 @@ class _JoinSplitBillScreenState extends State<JoinSplitBillScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              '${bill.organizerName} さんからこの金額の請求が届きます。'
+              '${bill.organizerName} さんから'
+              '${bill.isRanked ? '${_selectedRank!.label}の' : ''}'
+              'この金額の請求が届きます。'
               '支払いはグループ画面から行えます。',
               style: const TextStyle(fontSize: 12),
             ),
@@ -100,7 +114,12 @@ class _JoinSplitBillScreenState extends State<JoinSplitBillScreen> {
 
     setState(() => _isJoining = true);
     try {
-      final joined = await ApiClient.instance.joinSplitBill(bill.billCode);
+      final joined = bill.isRanked
+          ? await ApiClient.instance.joinRankedSplitBill(
+              bill.billCode,
+              _selectedRank!.rankCode,
+            )
+          : await ApiClient.instance.joinSplitBill(bill.billCode);
       if (!mounted) return;
       // 参加後はそのままグループ画面へ移動する
       await Navigator.of(context).pushReplacement(
@@ -157,7 +176,12 @@ class _JoinSplitBillScreenState extends State<JoinSplitBillScreen> {
                           border: const OutlineInputBorder(),
                         ),
                         onChanged: (_) {
-                          if (_bill != null) setState(() => _bill = null);
+                          if (_bill != null) {
+                            setState(() {
+                              _bill = null;
+                              _selectedRank = null;
+                            });
+                          }
                         },
                         onSubmitted: (_) => _lookup(),
                       ),
@@ -199,21 +223,64 @@ class _JoinSplitBillScreenState extends State<JoinSplitBillScreen> {
                           const SizedBox(height: 4),
                           Text('集金者: ${bill.organizerName} さん'),
                           const SizedBox(height: 12),
-                          Text(
-                            'あなたの支払い額',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          Text(
-                            formatMoney(bill.currency, bill.shareAmount),
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineSmall
-                                ?.copyWith(fontWeight: FontWeight.bold),
-                          ),
+                          if (bill.isRanked &&
+                              !bill.joined &&
+                              !bill.isOrganizer) ...[
+                            Text(
+                              '支払いランクを選択',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 8),
+                            ...bill.ranks.map(
+                              (rank) => Card(
+                                color: _selectedRank == rank
+                                    ? Theme.of(context)
+                                        .colorScheme
+                                        .primaryContainer
+                                    : null,
+                                child: ListTile(
+                                  onTap: _isJoining
+                                      ? null
+                                      : () => setState(
+                                            () => _selectedRank = rank,
+                                          ),
+                                  leading: Icon(
+                                    _selectedRank == rank
+                                        ? Icons.radio_button_checked
+                                        : Icons.radio_button_unchecked,
+                                  ),
+                                  title: Text(rank.label),
+                                  trailing: Text(
+                                    formatMoney(bill.currency, rank.amount),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ] else ...[
+                            Text(
+                              bill.isRanked ? 'ランク別支払い' : 'あなたの支払い額',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            Text(
+                              bill.isRanked
+                                  ? 'ランクを選択して参加します'
+                                  : formatMoney(
+                                      bill.currency,
+                                      bill.shareAmount,
+                                    ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineSmall
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                          ],
                           const SizedBox(height: 8),
                           Text(
-                            '合計 ${formatMoney(bill.currency, bill.totalAmount)}'
-                            ' を ${bill.participantCount} 人で割り勘'
+                            '${bill.isRanked ? 'ランク別金額' : '合計 ${formatMoney(bill.currency, bill.totalAmount)}'}'
+                            '・${bill.participantCount} 人で割り勘'
                             '（現在 ${bill.joinedCount} / ${bill.expectedPayerCount} 人が参加）',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
@@ -240,7 +307,10 @@ class _JoinSplitBillScreenState extends State<JoinSplitBillScreen> {
                     const _NoticeCard(message: '参加人数の上限に達しているため参加できません。')
                   else
                     FilledButton.icon(
-                      onPressed: _isJoining ? null : _join,
+                      onPressed:
+                          _isJoining || (bill.isRanked && _selectedRank == null)
+                              ? null
+                              : _join,
                       style: FilledButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
