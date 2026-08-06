@@ -147,6 +147,7 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
     } finally {
       if (mounted) setState(() => _isCreating = false);
     }
+  }
   /// 傾斜つきの割り勘を作成する。
   ///
   /// 割り振りの計算はこの画面（フロント）で完結している。
