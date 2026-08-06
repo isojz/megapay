@@ -8,7 +8,12 @@ class ProfileResponse(BaseModel):
     user_id: str
     display_name: str
     email: str
+    avatar_key: str
     created_at: datetime | None = None
+
+
+class ProfileAvatarUpdate(BaseModel):
+    avatar_key: str = Field(pattern=r"^avatar_0[1-6]$")
 
 
 class BalanceResponse(BaseModel):

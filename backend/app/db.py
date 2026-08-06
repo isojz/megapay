@@ -15,7 +15,10 @@ from .config import get_settings
 
 def _client(token: str) -> Client:
     settings = get_settings()
-    client = create_client(settings.supabase_url, settings.supabase_anon_key)
+    client = create_client(
+        settings.supabase_url,
+        settings.supabase_anon_key,
+    )
     client.postgrest.auth(token)
     return client
 
@@ -25,11 +28,14 @@ def _amount_str(value: Any) -> str:
     return format(Decimal(str(value)).normalize(), "f")
 
 
-def fetch_profile(token: str, profile_id: str) -> dict[str, Any] | None:
+def fetch_profile(
+    token: str,
+    profile_id: str,
+) -> dict[str, Any] | None:
     res = (
         _client(token)
         .table("profiles")
-        .select("user_id, display_name, created_at")
+        .select("user_id, display_name, avatar_key, created_at")
         .eq("id", profile_id)
         .limit(1)
         .execute()
@@ -37,7 +43,26 @@ def fetch_profile(token: str, profile_id: str) -> dict[str, Any] | None:
     return res.data[0] if res.data else None
 
 
-def fetch_balances(token: str, profile_id: str) -> list[dict[str, Any]]:
+def update_avatar_key(
+    token: str,
+    profile_id: str,
+    avatar_key: str,
+) -> dict[str, Any] | None:
+    res = (
+        _client(token)
+        .table("profiles")
+        .update({"avatar_key": avatar_key})
+        .eq("id", profile_id)
+        .select("user_id, display_name, avatar_key, created_at")
+        .execute()
+    )
+    return res.data[0] if res.data else None
+
+
+def fetch_balances(
+    token: str,
+    profile_id: str,
+) -> list[dict[str, Any]]:
     res = (
         _client(token)
         .table("balances")
@@ -46,14 +71,28 @@ def fetch_balances(token: str, profile_id: str) -> list[dict[str, Any]]:
         .order("currency")
         .execute()
     )
+
     return [
-        {"currency": row["currency"], "amount": _amount_str(row["amount"])}
+        {
+            "currency": row["currency"],
+            "amount": _amount_str(row["amount"]),
+        }
         for row in res.data
     ]
 
 
-def find_recipient(token: str, recipient_user_id: str) -> dict[str, Any]:
-    res = _client(token).rpc("find_recipient", {"p_user_id": recipient_user_id}).execute()
+def find_recipient(
+    token: str,
+    recipient_user_id: str,
+) -> dict[str, Any]:
+    res = (
+        _client(token)
+        .rpc(
+            "find_recipient",
+            {"p_user_id": recipient_user_id},
+        )
+        .execute()
+    )
     return res.data
 
 
@@ -71,7 +110,6 @@ def execute_transfer(
             {
                 "p_recipient_user_id": recipient_user_id,
                 "p_currency": currency,
-                # float を経由させると精度が落ちるため文字列で渡す（numeric にキャストされる）
                 "p_amount": str(amount),
                 "p_memo": memo,
             },
@@ -81,16 +119,43 @@ def execute_transfer(
     return res.data
 
 
-def list_transfers(token: str, limit: int = 50) -> list[dict[str, Any]]:
-    res = _client(token).rpc("list_my_transfers", {"p_limit": limit}).execute()
+def list_transfers(
+    token: str,
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    res = (
+        _client(token)
+        .rpc(
+            "list_my_transfers",
+            {"p_limit": limit},
+        )
+        .execute()
+    )
     return res.data
 
 
 def list_saved_users(token: str) -> list[dict[str, Any]]:
-    res = _client(token).rpc("list_my_saved_users", {}).execute()
+    res = (
+        _client(token)
+        .rpc(
+            "list_my_saved_users",
+            {},
+        )
+        .execute()
+    )
     return res.data
 
 
-def save_user(token: str, user_id: str) -> dict[str, Any]:
-    res = _client(token).rpc("save_user", {"p_user_id": user_id}).execute()
+def save_user(
+    token: str,
+    user_id: str,
+) -> dict[str, Any]:
+    res = (
+        _client(token)
+        .rpc(
+            "save_user",
+            {"p_user_id": user_id},
+        )
+        .execute()
+    )
     return res.data
