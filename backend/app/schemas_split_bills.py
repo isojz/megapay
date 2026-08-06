@@ -26,6 +26,35 @@ class SplitBillCreate(BaseModel):
         return value
 
 
+class RankedSplitBillTestCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=100)
+    participant_count: int = Field(ge=2, le=100)
+
+
+class RankedSplitBillRankCreate(BaseModel):
+    label: str = Field(min_length=1, max_length=50)
+    amount: Decimal = Field(gt=0)
+    capacity: int = Field(ge=1, le=99)
+
+
+class RankedSplitBillCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=100)
+    currency: str = Field(default="JPY", pattern=r"^[A-Za-z0-9]{3,10}$")
+    ranks: list[RankedSplitBillRankCreate] = Field(min_length=1, max_length=20)
+
+
+class RankedSplitBillJoin(BaseModel):
+    rank_code: str = Field(min_length=1, max_length=20)
+
+
+class SplitBillRank(BaseModel):
+    rank_code: str
+    label: str
+    amount: str
+    display_order: int
+    capacity: int | None = None
+
+
 class SplitBillResponse(BaseModel):
     bill_code: str  # 参加用の請求コード（SP-XXXXXXXX）
     title: str
@@ -43,6 +72,8 @@ class SplitBillResponse(BaseModel):
     paid_count: int  # 支払い済み人数
     collected_amount: str  # 集まった金額
     created_at: datetime
+    allocation_mode: str = "equal"
+    ranks: list[SplitBillRank] = Field(default_factory=list)
 
 
 class PublicSplitBillResponse(BaseModel):
@@ -55,6 +86,8 @@ class PublicSplitBillResponse(BaseModel):
     participant_count: int
     share_amount: str
     organizer_name: str
+    allocation_mode: str = "equal"
+    ranks: list[SplitBillRank] = Field(default_factory=list)
 
 
 class SplitBillParticipant(BaseModel):
@@ -69,3 +102,6 @@ class SplitBillParticipant(BaseModel):
     paid_at: datetime | None = None
     is_me: bool
     joined_at: datetime
+    rank_code: str | None = None
+    rank_label: str | None = None
+    rank_amount: str | None = None
