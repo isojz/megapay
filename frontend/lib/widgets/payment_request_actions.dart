@@ -47,36 +47,6 @@ class PaymentRequestActions extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _ActionSection(
-              title: '請求',
-              children: [
-                _ActionItem(
-                  icon: Icons.receipt_long,
-                  label: '請求する',
-                  onTap: () => _open(
-                    context,
-                    const RequestCreateScreen(),
-                  ),
-                ),
-                _ActionItem(
-                  icon: Icons.password,
-                  label: 'コードで支払う',
-                  onTap: () => _open(
-                    context,
-                    const PayRequestScreen(),
-                  ),
-                ),
-                _ActionItem(
-                  icon: Icons.fact_check_outlined,
-                  label: '請求状況',
-                  onTap: () => _open(
-                    context,
-                    const RequestListScreen(),
-                  ),
-                ),
-              ],
-            ),
-            divider,
-            _ActionSection(
               title: '割り勘',
               children: [
                 _ActionItem(
@@ -114,6 +84,36 @@ class PaymentRequestActions extends StatelessWidget {
                   onTap: () => _open(
                     context,
                     WithdrawScreen(balances: balances),
+                  ),
+                ),
+              ],
+            ),
+            divider,
+            _ActionSection(
+              title: '請求',
+              children: [
+                _ActionItem(
+                  icon: Icons.receipt_long,
+                  label: '請求する',
+                  onTap: () => _open(
+                    context,
+                    const RequestCreateScreen(),
+                  ),
+                ),
+                _ActionItem(
+                  icon: Icons.password,
+                  label: 'コードで支払う',
+                  onTap: () => _open(
+                    context,
+                    const PayRequestScreen(),
+                  ),
+                ),
+                _ActionItem(
+                  icon: Icons.fact_check_outlined,
+                  label: '請求状況',
+                  onTap: () => _open(
+                    context,
+                    const RequestListScreen(),
                   ),
                 ),
               ],
