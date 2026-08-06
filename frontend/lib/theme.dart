@@ -186,6 +186,34 @@ ThemeData _buildTheme(Brightness brightness) {
   );
 
   return base.copyWith(
+    // 文字の大きさが 14〜16px に集まっていると、どこから読めばよいか
+    // 分からず全体がのっぺりする。見出し・本文・補足の差を広げて、
+    // 視線の入口を作る。
+    textTheme: base.textTheme.copyWith(
+      // 画面内の区切り見出し（「残高」「最近の履歴」など）
+      titleMedium: base.textTheme.titleMedium?.copyWith(
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.1,
+      ),
+      titleSmall: base.textTheme.titleSmall?.copyWith(
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+      ),
+      // 一覧の主行。既定より少し詰めて情報量を上げる
+      bodyLarge: base.textTheme.bodyLarge?.copyWith(height: 1.35),
+      bodyMedium: base.textTheme.bodyMedium?.copyWith(height: 1.4),
+      // 補足は明確に小さくして、主役と競わせない
+      bodySmall: base.textTheme.bodySmall?.copyWith(
+        fontSize: 12,
+        height: 1.35,
+        color: colorScheme.onSurfaceVariant,
+      ),
+      labelMedium: base.textTheme.labelMedium?.copyWith(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
     // ヘッダーはイメージカラー。上に載る文字とアイコンは白で統一する。
     // スクロールで内容が潜り込んでも色が変わらないよう固定する。
     appBarTheme: const AppBarTheme(
