@@ -13,6 +13,16 @@ String formatMoney(String currency, String amount) {
   return '${NumberFormat(pattern).format(value)} $currency';
 }
 
+/// 日本円を通貨コードなしで表示する。例: formatYen('500000') => '500,000 円'
+/// 日本円のみを扱う画面で、'JPY' の代わりに使う。
+String formatYen(String amount) {
+  final value = double.tryParse(amount);
+  if (value == null) {
+    return '$amount 円';
+  }
+  return '${NumberFormat('#,##0').format(value)} 円';
+}
+
 /// 履歴一覧などで使う日時表示。例: 2026/08/04 09:30
 String formatDateTime(DateTime dateTime) {
   return DateFormat('yyyy/MM/dd HH:mm').format(dateTime);
