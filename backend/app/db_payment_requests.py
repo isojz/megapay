@@ -50,6 +50,19 @@ def pay_request_by_cash(token: str, code: str) -> dict[str, Any]:
     return res.data
 
 
+def pay_request_by_external(token: str, code: str) -> dict[str, Any]:
+    """PayPay・カードなどの外部決済で支払ったことを記録する。
+
+    支払い者の残高は減らさず、集金者の残高と双方の送金履歴にだけ反映する。
+    """
+    res = (
+        _client(token)
+        .rpc("pay_payment_request_by_external", {"p_code": code})
+        .execute()
+    )
+    return res.data
+
+
 def cancel_request(token: str, code: str) -> dict[str, Any]:
     res = _client(token).rpc("cancel_payment_request", {"p_code": code}).execute()
     return res.data

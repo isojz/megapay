@@ -83,6 +83,23 @@ def pay_payment_request_by_cash(
     return PaymentRequestResponse(**data)
 
 
+@router.post("/{request_code}/pay-external", response_model=PaymentRequestResponse)
+def pay_payment_request_by_external(
+    request_code: str,
+    user: AuthUser = Depends(get_current_user),
+) -> PaymentRequestResponse:
+    """PayPay・カードなどの外部決済で支払ったことを記録する。
+
+    引き落としは外部の決済事業者側で行われる想定のため、支払い者の残高は
+    減らさない。集金者の残高と、双方の送金履歴には反映する。
+    """
+    try:
+        data = db.pay_request_by_external(user.token, request_code.strip())
+    except APIError as err:
+        raise to_http_exception(err) from err
+    return PaymentRequestResponse(**data)
+
+
 @router.post("/{request_code}/cancel", response_model=PaymentRequestResponse)
 def cancel_payment_request(
     request_code: str,

@@ -6,6 +6,7 @@ import '../models/payment_request.dart';
 import '../services/api_client.dart';
 import '../utils/money.dart';
 import '../widgets/saved_user_picker.dart';
+import '../utils/input_formatters.dart';
 
 /// 請求作成画面：相手のユーザーIDを指定して請求し、支払い用の請求コードを発行する。
 class RequestCreateScreen extends StatefulWidget {
@@ -249,15 +250,12 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _payerController,
-                          decoration: InputDecoration(
+                          decoration: const InputDecoration(
                             labelText: '相手のユーザーID',
                             hintText: 'MP-12345678',
-                            hintStyle: TextStyle(
-                              color: theme.colorScheme.onSurfaceVariant
-                                  .withValues(alpha: 0.45),
-                            ),
-                            border: const OutlineInputBorder(),
+                            border: OutlineInputBorder(),
                           ),
+                          inputFormatters: userIdInputFormatters,
                           onChanged: (_) {
                             if (_verifiedPayer != null) {
                               setState(() => _verifiedPayer = null);
@@ -329,6 +327,7 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
+                    inputFormatters: decimalAmountInputFormatters,
                     decoration: const InputDecoration(
                       labelText: '請求金額',
                       suffixText: '円',

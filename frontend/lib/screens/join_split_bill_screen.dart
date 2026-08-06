@@ -4,6 +4,7 @@ import '../models/split_bill.dart';
 import '../services/api_client.dart';
 import '../utils/money.dart';
 import 'split_bill_detail_screen.dart';
+import '../utils/input_formatters.dart';
 
 /// 割り勘への参加画面：集金者から伝えられた請求コードを入力してグループに参加する。
 /// 参加すると同時に「集金者 → 自分」の請求（割り勘後の金額）が作成される。
@@ -145,17 +146,12 @@ class _JoinSplitBillScreenState extends State<JoinSplitBillScreen> {
                       child: TextField(
                         controller: _codeController,
                         textCapitalization: TextCapitalization.characters,
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           labelText: '集金者から伝えられたコード',
                           hintText: 'SP-ABCD2345',
-                          hintStyle: TextStyle(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant
-                                .withValues(alpha: 0.45),
-                          ),
-                          border: const OutlineInputBorder(),
+                          border: OutlineInputBorder(),
                         ),
+                        inputFormatters: codeInputFormatters,
                         onChanged: (_) {
                           if (_bill != null) setState(() => _bill = null);
                         },

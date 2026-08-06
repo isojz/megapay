@@ -5,7 +5,7 @@ import '../services/api_client.dart';
 import '../utils/money.dart';
 import '../widgets/payment_request_tile.dart';
 import '../widgets/payment_method_selector.dart';
-import 'split_bill_list_screen.dart';
+import '../utils/input_formatters.dart';
 
 /// 請求コードを入力して支払う画面。
 /// 一覧から開く場合は [initialCode] を渡すと自動で内容を取得する。
@@ -75,11 +75,6 @@ class _PayRequestScreenState extends State<PayRequestScreen> {
     final request = _request;
     if (request == null) return;
 
-    if (_paymentMethod != PaymentMethod.balance) {
-      await _payWithMock(request);
-      return;
-    }
-
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -102,11 +97,14 @@ class _PayRequestScreenState extends State<PayRequestScreen> {
               Text('メモ: ${request.memo}'),
             ],
             const SizedBox(height: 8),
-            const _ConfirmRow(label: '支払い方法', value: 'MegaPay残高'),
+            _ConfirmRow(label: '支払い方法', value: _paymentMethod.label),
             const SizedBox(height: 8),
-            const Text(
-              '支払うと送金が実行されます。取り消せません。',
-              style: TextStyle(fontSize: 12),
+            Text(
+              _paymentMethod == PaymentMethod.balance
+                  ? '支払うと残高から送金が実行されます。取り消せません。'
+                  : '${_paymentMethod.label}で引き落とされます。'
+                      'MegaPay残高は減りません。取り消せません。',
+              style: const TextStyle(fontSize: 12),
             ),
           ],
         ),
@@ -126,8 +124,12 @@ class _PayRequestScreenState extends State<PayRequestScreen> {
 
     setState(() => _isPaying = true);
     try {
-      final paid =
-          await ApiClient.instance.payPaymentRequest(request.requestCode);
+      final api = ApiClient.instance;
+      // 残高払いだけが自分の残高を減らす。PayPay・カードは外部で引き落とされる
+      // 想定なので、相手の残高と履歴にだけ反映する。
+      final paid = _paymentMethod == PaymentMethod.balance
+          ? await api.payPaymentRequest(request.requestCode)
+          : await api.payPaymentRequestByExternal(request.requestCode);
       if (!mounted) return;
       setState(() => _request = paid);
       await showDialog<void>(
@@ -156,74 +158,6 @@ class _PayRequestScreenState extends State<PayRequestScreen> {
     }
   }
 
-  Future<void> _payWithMock(PaymentRequest request) async {
-    final method = _paymentMethod;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('モック決済の確認'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('${request.requesterName} さんへ'),
-            const SizedBox(height: 4),
-            Text(
-              formatMoney(request.currency, request.amount),
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            _ConfirmRow(label: '支払い方法', value: method.label),
-            const SizedBox(height: 12),
-            const Text(
-              'デモ用の画面です。実際の決済、残高更新、請求状態の更新は行われません。',
-              style: TextStyle(fontSize: 12),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('キャンセル'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('モック決済を実行'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
-    setState(() => _isPaying = true);
-    await Future<void>.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
-    setState(() => _isPaying = false);
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.check_circle_outline,
-            color: Colors.green, size: 48),
-        title: const Text('モック決済が完了しました'),
-        content: Text(
-          '${method.label}での支払い画面を確認しました。\n'
-          '実際の決済データは変更されていません。',
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('閉じる'),
-          ),
-        ],
-      ),
-    );
-    if (!mounted) return;
-    Navigator.of(context).popUntil((route) => route.isFirst);
-  }
-
   @override
   Widget build(BuildContext context) {
     final request = _request;
@@ -244,21 +178,6 @@ class _PayRequestScreenState extends State<PayRequestScreen> {
                 if (!openedFromRequestList) ...[
                   Text('請求コード', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: OutlinedButton.icon(
-                      // 割り勘の支払いは請求コードごとに画面が変わるため、
-                      // ここからは一覧に進み、支払う割り勘を選んでもらう
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const SplitBillListScreen(),
-                        ),
-                      ),
-                      icon: const Icon(Icons.groups_outlined),
-                      label: const Text('割り勘'),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -266,17 +185,12 @@ class _PayRequestScreenState extends State<PayRequestScreen> {
                         child: TextField(
                           controller: _codeController,
                           textCapitalization: TextCapitalization.characters,
-                          decoration: InputDecoration(
+                          decoration: const InputDecoration(
                             labelText: '相手から伝えられたコード',
                             hintText: 'RQ-ABCD2345',
-                            hintStyle: TextStyle(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant
-                                  .withValues(alpha: 0.45),
-                            ),
-                            border: const OutlineInputBorder(),
+                            border: OutlineInputBorder(),
                           ),
+                          inputFormatters: codeInputFormatters,
                           onChanged: (_) {
                             if (_request != null) {
                               setState(() => _request = null);
@@ -353,7 +267,7 @@ class _PayRequestScreenState extends State<PayRequestScreen> {
                           label: Text(
                             _paymentMethod == PaymentMethod.balance
                                 ? '残高から ${formatMoney(request.currency, request.amount)} を支払う'
-                                : '${_paymentMethod.label}で支払う（モック）',
+                                : '${_paymentMethod.label}で支払う',
                           ),
                         ),
                       ],

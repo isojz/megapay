@@ -30,4 +30,13 @@ def to_http_exception(err: APIError) -> HTTPException:
     for keyword, (status_code, detail) in _DB_ERROR_MAP.items():
         if keyword in message:
             return HTTPException(status_code, detail)
+
+    # 呼び出そうとした DB 関数が存在しない場合。マイグレーションの適用漏れで
+    # 起きるため、DB の一般的なエラーとは区別して原因が分かるようにする。
+    if "Could not find the function" in message or "PGRST202" in message:
+        return HTTPException(
+            status.HTTP_501_NOT_IMPLEMENTED,
+            "この機能はまだ利用できません（データベースの更新が必要です）",
+        )
+
     return HTTPException(status.HTTP_502_BAD_GATEWAY, "データベース処理でエラーが発生しました")

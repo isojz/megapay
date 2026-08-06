@@ -6,6 +6,7 @@ import '../services/api_client.dart';
 import '../utils/money.dart';
 import '../utils/browser_url.dart';
 import 'split_bill_detail_screen.dart';
+import '../utils/input_formatters.dart';
 
 /// 割り勘は日本円のみ対応する。
 const _currency = 'JPY';
@@ -114,7 +115,7 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                   TextFormField(
                     controller: _amountController,
                     keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    inputFormatters: integerAmountInputFormatters,
                     decoration: const InputDecoration(
                       labelText: '合計金額',
                       suffixText: '円',
@@ -134,7 +135,7 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                   TextFormField(
                     controller: _countController,
                     keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    inputFormatters: integerAmountInputFormatters,
                     decoration: const InputDecoration(
                       labelText: '人数',
                       suffixText: '人',
