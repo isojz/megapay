@@ -45,6 +45,18 @@ class SplitBillResponse(BaseModel):
     created_at: datetime
 
 
+class PublicSplitBillResponse(BaseModel):
+    """リンクを開いた未ログイン利用者にも公開できる最小限の情報。"""
+
+    bill_code: str
+    title: str
+    currency: str
+    total_amount: str
+    participant_count: int
+    share_amount: str
+    organizer_name: str
+
+
 class SplitBillParticipant(BaseModel):
     """グループ画面に並べる参加者 1 人分の支払い状況。"""
 

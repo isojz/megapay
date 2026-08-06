@@ -9,7 +9,10 @@ import '../widgets/saved_user_picker.dart';
 
 /// 請求作成画面：相手のユーザーIDを指定して請求し、支払い用の請求コードを発行する。
 class RequestCreateScreen extends StatefulWidget {
-  const RequestCreateScreen({super.key});
+  const RequestCreateScreen({super.key, this.initialPayer});
+
+  /// ユーザー一覧から開いたときに、請求先をあらかじめ埋めておく
+  final RecipientInfo? initialPayer;
 
   @override
   State<RequestCreateScreen> createState() => _RequestCreateScreenState();
@@ -27,6 +30,37 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
   bool _isLookingUp = false;
   bool _isCreating = false;
 
+  /// 自分自身への請求を送信前に弾くために保持する。
+  String? _myUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    final payer = widget.initialPayer;
+    if (payer != null) {
+      _payerController.text = payer.userId;
+      _verifiedPayer = payer;
+    }
+    _loadMyUserId();
+  }
+
+  Future<void> _loadMyUserId() async {
+    try {
+      final profile = await ApiClient.instance.fetchProfile();
+      if (mounted) setState(() => _myUserId = profile.userId);
+    } on ApiException {
+      // 取得できなくてもサーバー側で弾かれるため、ここでは何もしない
+    }
+  }
+
+  /// 入力されたユーザーIDが自分自身かどうか。
+  /// ユーザーIDは大文字で扱われるため、比較時に揃える。
+  bool _isMyself(String userId) {
+    final myUserId = _myUserId;
+    return myUserId != null &&
+        userId.trim().toUpperCase() == myUserId.toUpperCase();
+  }
+
   @override
   void dispose() {
     _payerController.dispose();
@@ -37,6 +71,7 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
 
   void _showError(String message) {
     if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -59,21 +94,38 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
   /// 請求先のユーザーIDから相手を検索して表示名を確認する。
   Future<RecipientInfo?> _lookupPayer() async {
     final payerId = _payerController.text.trim();
+
     if (payerId.isEmpty) {
       _showError('請求先のユーザーIDを入力してください');
       return null;
     }
+
+    if (_isMyself(payerId)) {
+      _showError('自分自身には請求できません');
+      return null;
+    }
+
     setState(() => _isLookingUp = true);
+
     try {
       final payer = await ApiClient.instance.lookupRecipient(payerId);
-      if (mounted) setState(() => _verifiedPayer = payer);
+
+      if (mounted) {
+        setState(() => _verifiedPayer = payer);
+      }
+
       return payer;
     } on ApiException catch (err) {
-      if (mounted) setState(() => _verifiedPayer = null);
+      if (mounted) {
+        setState(() => _verifiedPayer = null);
+      }
+
       _showError(err.message);
       return null;
     } finally {
-      if (mounted) setState(() => _isLookingUp = false);
+      if (mounted) {
+        setState(() => _isLookingUp = false);
+      }
     }
   }
 
@@ -82,6 +134,7 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
 
     // 請求先が未確認ならここで確認する
     final payer = _verifiedPayer ?? await _lookupPayer();
+
     if (payer == null || !mounted) return;
 
     const currency = _currency;
@@ -96,13 +149,27 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _ConfirmRow(label: '請求先', value: '${payer.displayName} さん'),
-            _ConfirmRow(label: 'ユーザーID', value: payer.userId),
-            _ConfirmRow(label: '金額', value: formatMoney(currency, amount)),
-            if (memo.isNotEmpty) _ConfirmRow(label: 'メモ', value: memo),
+            _ConfirmRow(
+              label: '請求先',
+              value: '${payer.displayName} さん',
+            ),
+            _ConfirmRow(
+              label: 'ユーザーID',
+              value: payer.userId,
+            ),
+            _ConfirmRow(
+              label: '金額',
+              value: formatMoney(currency, amount),
+            ),
+            if (memo.isNotEmpty)
+              _ConfirmRow(
+                label: 'メモ',
+                value: memo,
+              ),
             const SizedBox(height: 8),
             const Text(
-              '請求コードが発行されます。相手がコードを入力すると支払いが完了します。',
+              '請求コードが発行されます。'
+              '相手がコードを入力すると支払いが完了します。',
               style: TextStyle(fontSize: 12),
             ),
           ],
@@ -119,9 +186,11 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
         ],
       ),
     );
+
     if (confirmed != true || !mounted) return;
 
     setState(() => _isCreating = true);
+
     try {
       final request = await ApiClient.instance.createPaymentRequest(
         payerUserId: payer.userId,
@@ -129,24 +198,36 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
         amount: amount,
         memo: memo.isEmpty ? null : memo,
       );
+
       if (!mounted) return;
+
       await showDialog<void>(
         context: context,
-        builder: (context) => _RequestCreatedDialog(request: request),
+        builder: (context) => _RequestCreatedDialog(
+          request: request,
+        ),
       );
+
       if (!mounted) return;
+
       Navigator.of(context).pop();
     } on ApiException catch (err) {
       _showError(err.message);
     } finally {
-      if (mounted) setState(() => _isCreating = false);
+      if (mounted) {
+        setState(() => _isCreating = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('請求')),
+      appBar: AppBar(
+        title: const Text('請求'),
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -157,7 +238,10 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('請求先', style: Theme.of(context).textTheme.titleMedium),
+                  Text(
+                    '請求先',
+                    style: theme.textTheme.titleMedium,
+                  ),
                   const SizedBox(height: 8),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,20 +249,33 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _payerController,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: '相手のユーザーID',
                             hintText: 'MP-12345678',
-                            border: OutlineInputBorder(),
+                            hintStyle: TextStyle(
+                              color: theme.colorScheme.onSurfaceVariant
+                                  .withValues(alpha: 0.45),
+                            ),
+                            border: const OutlineInputBorder(),
                           ),
                           onChanged: (_) {
                             if (_verifiedPayer != null) {
                               setState(() => _verifiedPayer = null);
                             }
                           },
-                          validator: (value) =>
-                              (value == null || value.trim().isEmpty)
-                                  ? '請求先のユーザーIDを入力してください'
-                                  : null,
+                          validator: (value) {
+                            final userId = value?.trim() ?? '';
+
+                            if (userId.isEmpty) {
+                              return '請求先のユーザーIDを入力してください';
+                            }
+
+                            if (_isMyself(userId)) {
+                              return '自分自身には請求できません';
+                            }
+
+                            return null;
+                          },
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -190,8 +287,9 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
                               ? const SizedBox(
                                   height: 20,
                                   width: 20,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : const Text('確認'),
                         ),
@@ -210,29 +308,41 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
                     Card(
                       color: Colors.green.shade50,
                       child: ListTile(
-                        leading:
-                            const Icon(Icons.check_circle, color: Colors.green),
-                        title: Text('${_verifiedPayer!.displayName} さん'),
+                        leading: const Icon(
+                          Icons.check_circle,
+                          color: Colors.green,
+                        ),
+                        title: Text(
+                          '${_verifiedPayer!.displayName} さん',
+                        ),
                         subtitle: Text(_verifiedPayer!.userId),
                       ),
                     ),
                   const SizedBox(height: 24),
-                  Text('金額', style: Theme.of(context).textTheme.titleMedium),
+                  Text(
+                    '金額',
+                    style: theme.textTheme.titleMedium,
+                  ),
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _amountController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     decoration: const InputDecoration(
                       labelText: '請求金額',
                       suffixText: '円',
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
-                      final amount = double.tryParse(value?.trim() ?? '');
+                      final amount = double.tryParse(
+                        value?.trim() ?? '',
+                      );
+
                       if (amount == null || amount <= 0) {
                         return '正しい金額を入力してください';
                       }
+
                       return null;
                     },
                   ),
@@ -250,13 +360,17 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
                   FilledButton.icon(
                     onPressed: _isCreating ? null : _create,
                     style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                      ),
                     ),
                     icon: _isCreating
                         ? const SizedBox(
                             height: 20,
                             width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
                           )
                         : const Icon(Icons.receipt_long),
                     label: const Text('請求する'),
@@ -273,23 +387,36 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
 
 /// 請求作成後に、発行された請求コードを大きく表示してコピーできるようにする。
 class _RequestCreatedDialog extends StatelessWidget {
-  const _RequestCreatedDialog({required this.request});
+  const _RequestCreatedDialog({
+    required this.request,
+  });
 
   final PaymentRequest request;
 
   Future<void> _copyCode(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
-    await Clipboard.setData(ClipboardData(text: request.requestCode));
+
+    await Clipboard.setData(
+      ClipboardData(text: request.requestCode),
+    );
+
     messenger.showSnackBar(
-      const SnackBar(content: Text('請求コードをコピーしました')),
+      const SnackBar(
+        content: Text('請求コードをコピーしました'),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     return AlertDialog(
-      icon: const Icon(Icons.receipt_long, color: Colors.green, size: 48),
+      icon: const Icon(
+        Icons.receipt_long,
+        color: Colors.green,
+        size: 48,
+      ),
       title: const Text('請求を作成しました'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -300,7 +427,10 @@ class _RequestCreatedDialog extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
-          Text('請求コード', style: theme.textTheme.bodySmall),
+          Text(
+            '請求コード',
+            style: theme.textTheme.bodySmall,
+          ),
           const SizedBox(height: 4),
           SelectableText(
             request.requestCode,
@@ -313,7 +443,10 @@ class _RequestCreatedDialog extends StatelessWidget {
           const SizedBox(height: 8),
           FilledButton.tonalIcon(
             onPressed: () => _copyCode(context),
-            icon: const Icon(Icons.copy, size: 18),
+            icon: const Icon(
+              Icons.copy,
+              size: 18,
+            ),
             label: const Text('コードをコピー'),
           ),
           const SizedBox(height: 12),
@@ -336,13 +469,18 @@ class _RequestCreatedDialog extends StatelessWidget {
 }
 
 class _ConfirmRow extends StatelessWidget {
-  const _ConfirmRow({required this.label, required this.value});
+  const _ConfirmRow({
+    required this.label,
+    required this.value,
+  });
 
   final String label;
   final String value;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -352,19 +490,17 @@ class _ConfirmRow extends StatelessWidget {
             width: 88,
             child: Text(
               label,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: Theme.of(context).colorScheme.outline),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.outline,
+              ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(fontWeight: FontWeight.bold),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],

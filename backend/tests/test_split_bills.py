@@ -81,6 +81,27 @@ def test_requires_auth():
         assert test_client.post(f"{BASE}/SP-ABCD2345/join").status_code == 401
 
 
+def test_public_split_bill_does_not_require_auth(monkeypatch):
+    monkeypatch.setattr(
+        db,
+        "find_public_split_bill",
+        lambda code: {
+            "bill_code": "SP-ABCD2345",
+            "title": "歓迎会",
+            "currency": "JPY",
+            "total_amount": "50000",
+            "participant_count": 10,
+            "share_amount": "5000",
+            "organizer_name": "太郎",
+        },
+    )
+    with TestClient(app) as test_client:
+        res = test_client.get(f"{BASE}/public/SP-ABCD2345")
+    assert res.status_code == 200
+    assert res.json()["organizer_name"] == "太郎"
+    assert res.json()["share_amount"] == "5000"
+
+
 def test_create_split_bill_normalizes_input(client, monkeypatch):
     captured = {}
 

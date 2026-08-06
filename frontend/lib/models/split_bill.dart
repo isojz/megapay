@@ -2,6 +2,37 @@
 /// 金額は桁落ち防止のため API 上は文字列で受け渡しする（表示時のみ数値化）。
 library;
 
+class PublicSplitBill {
+  const PublicSplitBill({
+    required this.billCode,
+    required this.title,
+    required this.currency,
+    required this.totalAmount,
+    required this.participantCount,
+    required this.shareAmount,
+    required this.organizerName,
+  });
+
+  final String billCode;
+  final String title;
+  final String currency;
+  final String totalAmount;
+  final int participantCount;
+  final String shareAmount;
+  final String organizerName;
+
+  factory PublicSplitBill.fromJson(Map<String, dynamic> json) =>
+      PublicSplitBill(
+        billCode: json['bill_code'] as String,
+        title: json['title'] as String,
+        currency: json['currency'] as String,
+        totalAmount: json['total_amount'] as String,
+        participantCount: json['participant_count'] as int,
+        shareAmount: json['share_amount'] as String,
+        organizerName: json['organizer_name'] as String? ?? '',
+      );
+}
+
 class SplitBill {
   const SplitBill({
     required this.billCode,
@@ -117,7 +148,8 @@ class SplitBillParticipant {
 
   bool get isPaid => status == 'paid';
   bool get isPaidByCash => isPaid && paymentMethod == 'cash';
-  String get statusLabel => isPaid ? (isPaidByCash ? '現金で受取済み' : '支払い済み') : '未払い';
+  String get statusLabel =>
+      isPaid ? (isPaidByCash ? '現金で受取済み' : '支払い済み') : '未払い';
 
   factory SplitBillParticipant.fromJson(Map<String, dynamic> json) =>
       SplitBillParticipant(

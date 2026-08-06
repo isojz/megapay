@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../models/split_bill.dart';
 import '../services/api_client.dart';
 import '../utils/money.dart';
+import '../utils/browser_url.dart';
 import 'split_bill_detail_screen.dart';
 
 /// 割り勘は日本円のみ対応する。
@@ -190,6 +191,16 @@ class _SplitBillCreatedDialog extends StatelessWidget {
     );
   }
 
+  String get _paymentLink => buildSplitBillPaymentLink(bill.billCode);
+
+  Future<void> _copyLink(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await Clipboard.setData(ClipboardData(text: _paymentLink));
+    messenger.showSnackBar(
+      const SnackBar(content: Text('支払いリンクをコピーしました')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -229,6 +240,20 @@ class _SplitBillCreatedDialog extends StatelessWidget {
             onPressed: () => _copyCode(context),
             icon: const Icon(Icons.copy, size: 18),
             label: const Text('コードをコピー'),
+          ),
+          const SizedBox(height: 20),
+          Text('支払いリンク', style: theme.textTheme.bodySmall),
+          const SizedBox(height: 4),
+          SelectableText(
+            _paymentLink,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          FilledButton.tonalIcon(
+            onPressed: () => _copyLink(context),
+            icon: const Icon(Icons.link, size: 18),
+            label: const Text('リンクをコピー'),
           ),
           const SizedBox(height: 12),
           Text(

@@ -77,7 +77,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '現在の残高（日本円）',
+                        '現在の残高',
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       const SizedBox(height: 8),
