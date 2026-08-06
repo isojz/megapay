@@ -40,16 +40,7 @@ class PaymentMethodSelector extends StatelessWidget {
           selected: selected == method,
           onSelected: onSelected == null ? null : (_) => onSelected!(method),
           avatar: Icon(method.icon, size: 18),
-          label: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(method.label),
-              if (method.isMock) ...[
-                const SizedBox(width: 4),
-                const Text('モック', style: TextStyle(fontSize: 10)),
-              ],
-            ],
-          ),
+          label: Text(method.label),
         );
       }).toList(),
     );

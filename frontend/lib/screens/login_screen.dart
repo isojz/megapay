@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// ログイン / 口座開設（サインアップ）画面。
+import '../theme.dart';
+import '../utils/input_formatters.dart';
+
+/// ログイン / アカウント開設（サインアップ）画面。
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, this.onAuthenticated});
 
@@ -116,8 +119,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.currency_exchange,
-                      size: 64, color: Color(0xFF0D47A1)),
+                  // 背景がグレーなので、白いアイコンはブランドカラーの円に載せる
+                  const CircleAvatar(
+                    radius: 40,
+                    backgroundColor: megaPayBrandColor,
+                    child: Icon(
+                      Icons.currency_exchange,
+                      size: 44,
+                      color: megaPayOnBrandColor,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     'MegaPay',
@@ -151,6 +162,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
+                    inputFormatters: emailInputFormatters,
                     textInputAction: TextInputAction.next,
                     decoration: const InputDecoration(
                       labelText: 'メールアドレス',
@@ -201,7 +213,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             width: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(_isSignUp ? '口座を開設する（無料）' : 'ログイン'),
+                        : Text(_isSignUp ? 'アカウント開設（無料）' : 'ログイン'),
                   ),
                   const SizedBox(height: 12),
                   TextButton(
@@ -209,7 +221,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ? null
                         : () => setState(() => _isSignUp = !_isSignUp),
                     child: Text(
-                        _isSignUp ? 'アカウントをお持ちの方はログイン' : '初めての方は口座開設（サインアップ）'),
+                        _isSignUp ? 'アカウントをお持ちの方はログイン' : '初めての方はアカウント開設'),
                   ),
                 ],
               ),

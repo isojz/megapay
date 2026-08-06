@@ -9,10 +9,11 @@ import 'home_screen.dart';
 
 /// 割り勘の支払い画面。
 ///
-/// 残高払いと現金払いは実際に請求の状態を更新する。
-///   - 残高から支払う: 送金が実行され、残高と履歴が動く
 ///   - 現金で支払った: その場で現金を渡した記録。残高・履歴は動かさず支払い済みにする
-/// PayPay やカードは決済連携が未実装のためモック（請求の状態は変わらない）。
+///   - それ以外の支払い方法: 送金が実行され、相手の残高と履歴に反映される
+///
+/// PayPay やカードは外部の決済連携が未実装のため、実際の引き落としは発生せず
+/// MegaPay 残高から送金される。表示上の支払い方法だけが変わる。
 class SplitBillPaymentMockScreen extends StatefulWidget {
   const SplitBillPaymentMockScreen({
     super.key,
@@ -72,18 +73,9 @@ class _SplitBillPaymentMockScreenState
     );
   }
 
-  /// 実際に請求の状態を更新できる支払い方法か（残高払い・現金払いのみ）
-  bool _isSupported(PaymentMethod method) =>
-      method == PaymentMethod.balance || method == PaymentMethod.cash;
-
   Future<void> _pay(PaymentRequest request) async {
     final method = _selectedMethod;
     final isCash = method == PaymentMethod.cash;
-
-    if (!_isSupported(method)) {
-      _showError('${method.label}での支払いはまだ利用できません');
-      return;
-    }
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -271,11 +263,9 @@ class _SplitBillPaymentMockScreenState
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        _isSupported(_selectedMethod)
-                            ? (_selectedMethod == PaymentMethod.cash
-                                ? '現金払いは残高を動かさず、支払い済みの記録だけを残します。'
-                                : 'MegaPay残高から集金者へ送金されます。')
-                            : '${_selectedMethod.label}は決済連携が未実装のため、まだ支払えません。',
+                        _selectedMethod == PaymentMethod.cash
+                            ? '現金払いは残高を動かさず、支払い済みの記録だけを残します。'
+                            : 'MegaPay残高から集金者へ送金されます。',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodySmall
                             ?.copyWith(color: theme.colorScheme.outline),

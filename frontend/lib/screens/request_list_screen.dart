@@ -13,13 +13,30 @@ class RequestListScreen extends StatefulWidget {
   State<RequestListScreen> createState() => _RequestListScreenState();
 }
 
+/// 請求状況の絞り込み。PaymentRequest.status の値に対応する。
+enum _RequestFilter { all, pending, paid, cancelled }
+
 class _RequestListScreenState extends State<RequestListScreen> {
   late Future<List<PaymentRequest>> _future;
+  _RequestFilter _filter = _RequestFilter.all;
 
   @override
   void initState() {
     super.initState();
     _future = ApiClient.instance.fetchPaymentRequests();
+  }
+
+  List<PaymentRequest> _applyFilter(List<PaymentRequest> requests) {
+    switch (_filter) {
+      case _RequestFilter.all:
+        return requests;
+      case _RequestFilter.pending:
+        return requests.where((r) => r.status == 'pending').toList();
+      case _RequestFilter.paid:
+        return requests.where((r) => r.status == 'paid').toList();
+      case _RequestFilter.cancelled:
+        return requests.where((r) => r.status == 'cancelled').toList();
+    }
   }
 
   Future<void> _reload() {
@@ -104,37 +121,81 @@ class _RequestListScreenState extends State<RequestListScreen> {
             );
           }
 
-          final requests = snapshot.data ?? const <PaymentRequest>[];
+          final all = snapshot.data ?? const <PaymentRequest>[];
+          final requests = _applyFilter(all);
           return RefreshIndicator(
             onRefresh: _reload,
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 480),
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
+                child: Column(
                   children: [
-                    if (requests.isEmpty)
-                      const Card(
-                        child: ListTile(
-                          title: Text('まだ請求はありません'),
-                          subtitle: Text('「請求する」から作成できます'),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      child: SingleChildScrollView(
+                        // 状態が4つあり狭い画面では収まらないため横スクロールさせる
+                        scrollDirection: Axis.horizontal,
+                        child: SegmentedButton<_RequestFilter>(
+                          segments: const [
+                            ButtonSegment(
+                              value: _RequestFilter.all,
+                              label: Text('すべて'),
+                            ),
+                            ButtonSegment(
+                              value: _RequestFilter.pending,
+                              label: Text('未払い'),
+                            ),
+                            ButtonSegment(
+                              value: _RequestFilter.paid,
+                              label: Text('支払い済み'),
+                            ),
+                            ButtonSegment(
+                              value: _RequestFilter.cancelled,
+                              label: Text('取り消し済み'),
+                            ),
+                          ],
+                          selected: {_filter},
+                          showSelectedIcon: false,
+                          onSelectionChanged: (selected) =>
+                              setState(() => _filter = selected.first),
                         ),
                       ),
-                    ...requests.map(
-                      (r) => PaymentRequestTile(
-                        request: r,
-                        actions: [
-                          if (r.isPending && r.isRequestedByMe)
-                            TextButton(
-                              onPressed: () => _cancel(r),
-                              child: const Text('取り消す'),
+                    ),
+                    Expanded(
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(16),
+                        children: [
+                          if (requests.isEmpty)
+                            Card(
+                              child: ListTile(
+                                title: Text(
+                                  _filter == _RequestFilter.all
+                                      ? 'まだ請求はありません'
+                                      : '該当する請求がありません',
+                                ),
+                                subtitle: _filter == _RequestFilter.all
+                                    ? const Text('「請求する」から作成できます')
+                                    : null,
+                              ),
                             ),
-                          if (r.isPending && !r.isRequestedByMe)
-                            FilledButton(
-                              onPressed: () => _openPayScreen(r),
-                              child: const Text('支払う'),
+                          ...requests.map(
+                            (r) => PaymentRequestTile(
+                              request: r,
+                              actions: [
+                                if (r.isPending && r.isRequestedByMe)
+                                  TextButton(
+                                    onPressed: () => _cancel(r),
+                                    child: const Text('取り消す'),
+                                  ),
+                                if (r.isPending && !r.isRequestedByMe)
+                                  FilledButton(
+                                    onPressed: () => _openPayScreen(r),
+                                    child: const Text('支払う'),
+                                  ),
+                              ],
                             ),
+                          ),
                         ],
                       ),
                     ),

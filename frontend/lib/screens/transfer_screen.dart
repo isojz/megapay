@@ -4,6 +4,7 @@ import '../models/models.dart';
 import '../services/api_client.dart';
 import '../utils/money.dart';
 import '../widgets/saved_user_picker.dart';
+import '../utils/input_formatters.dart';
 
 /// 送金画面：宛先（ユーザーID）と日本円の金額を指定して送金する。
 class TransferScreen extends StatefulWidget {
@@ -200,17 +201,12 @@ class _TransferScreenState extends State<TransferScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _recipientController,
-                          decoration: InputDecoration(
+                          decoration: const InputDecoration(
                             labelText: '相手のユーザーID',
                             hintText: 'MP-12345678',
-                            hintStyle: TextStyle(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant
-                                  .withValues(alpha: 0.45),
-                            ),
-                            border: const OutlineInputBorder(),
+                            border: OutlineInputBorder(),
                           ),
+                          inputFormatters: userIdInputFormatters,
                           onChanged: (_) {
                             if (_verifiedRecipient != null) {
                               setState(() => _verifiedRecipient = null);
@@ -273,6 +269,7 @@ class _TransferScreenState extends State<TransferScreen> {
                     controller: _amountController,
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: decimalAmountInputFormatters,
                     decoration: const InputDecoration(
                       labelText: '送金金額',
                       prefixText: '¥ ',
