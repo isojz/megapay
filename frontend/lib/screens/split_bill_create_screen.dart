@@ -42,31 +42,21 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
   _SplitMode _mode = _SplitMode.even;
 
   /// 傾斜のグループ設定（傾斜を選んだときだけ使う）
-  List<SplitGroup> _groups = const [
+  final _groupsNotifier = ValueNotifier<List<SplitGroup>>(const [
     SplitGroup(name: '多めに払う人', count: 1, weight: 1.5),
     SplitGroup(name: '少なめに払う人', count: 1, weight: 1.0),
-  ];
+  ]);
 
   /// 割り振りの単位。きりのよい金額にしやすいよう既定を 500 円にする。
-  int _unit = 500;
+  final _unitNotifier = ValueNotifier<int>(500);
 
   /// 合計金額の入力欄の現在値（傾斜の割り振り表示に使う）
   int? get _enteredAmount => int.tryParse(_amountController.text.trim());
 
   @override
-  void initState() {
-    super.initState();
-    // 金額を打つたびに傾斜の割り振りを計算し直す
-    _amountController.addListener(_onAmountChanged);
-  }
-
-  void _onAmountChanged() {
-    if (_mode == _SplitMode.weighted && mounted) setState(() {});
-  }
-
-  @override
   void dispose() {
-    _amountController.removeListener(_onAmountChanged);
+    _groupsNotifier.dispose();
+    _unitNotifier.dispose();
     _titleController.dispose();
     _amountController.dispose();
     _countController.dispose();
@@ -121,36 +111,6 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
     }
   }
 
-  Future<void> _createRankedTest() async {
-    final count = int.tryParse(_countController.text.trim());
-    if (count == null || count < 2 || count > _maxParticipants) {
-      _showError('参加人数は2〜$_maxParticipants人で入力してください');
-      return;
-    }
-    final title = _titleController.text.trim();
-    setState(() => _isCreating = true);
-    try {
-      final bill = await ApiClient.instance.createRankedSplitBillTest(
-        title: title.isEmpty ? 'ランク別割り勘（テスト）' : title,
-        participantCount: count,
-      );
-      if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (context) => _SplitBillCreatedDialog(bill: bill),
-      );
-      if (!mounted) return;
-      await Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => SplitBillDetailScreen(billCode: bill.billCode),
-        ),
-      );
-    } on ApiException catch (err) {
-      _showError(err.message);
-    } finally {
-      if (mounted) setState(() => _isCreating = false);
-    }
-  }
   /// 傾斜つきの割り勘を作成する。
   ///
   /// 割り振りの計算はこの画面（フロント）で完結している。
@@ -158,7 +118,9 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
   /// 確認できる状態にして、結果を呼び出し元へ返すところまでを行う。
   Future<void> _createWeighted() async {
     final amount = _enteredAmount;
-    final error = validateSplitGroups(_groups);
+    final groups = _groupsNotifier.value;
+    final unit = _unitNotifier.value;
+    final error = validateSplitGroups(groups);
     if (amount == null || amount <= 0) {
       _showError('合計金額を入力してください');
       return;
@@ -171,9 +133,17 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
     final title = _titleController.text.trim();
     final result = calculateWeightedSplit(
       totalAmount: amount,
-      groups: _groups,
-      unit: _unit,
+      groups: groups,
+      unit: unit,
     );
+    if (result.totalCount > _maxParticipants - 1) {
+      _showError('支払い者は${_maxParticipants - 1}人までです');
+      return;
+    }
+    if (result.hasZeroAmount) {
+      _showError('0円のグループがあります。割り振り単位を小さくしてください');
+      return;
+    }
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -206,7 +176,7 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
             const Divider(),
             Row(
               children: [
-                Expanded(child: Text('合計 ${result.totalCount} 人')),
+                Expanded(child: Text('支払い者 ${result.totalCount} 人')),
                 Text(
                   formatMoney(_currency, result.totalAmount.toString()),
                   style: const TextStyle(fontWeight: FontWeight.bold),
@@ -229,9 +199,48 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
     );
     if (confirmed != true || !mounted) return;
 
-    // TODO(team): 傾斜つき割り勘の作成・リンク発行はここに実装する。
-    //   result（グループごとの金額と合計）と title をそのまま渡せばよい。
-    Navigator.of(context).pop(result);
+    final ranks = <Map<String, dynamic>>[];
+    for (final group in result.groups) {
+      final normalCount = group.group.count - (group.hasExtra ? 1 : 0);
+      if (normalCount > 0) {
+        ranks.add({
+          'label': group.group.name.trim(),
+          'amount': group.amountPerPerson.toString(),
+          'capacity': normalCount,
+        });
+      }
+      if (group.hasExtra) {
+        ranks.add({
+          'label': '${group.group.name.trim()}（端数調整）',
+          'amount': group.amountWithExtra.toString(),
+          'capacity': 1,
+        });
+      }
+    }
+
+    setState(() => _isCreating = true);
+    try {
+      final bill = await ApiClient.instance.createRankedSplitBill(
+        title: title.isEmpty ? _defaultTitle : title,
+        currency: _currency,
+        ranks: ranks,
+      );
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => _SplitBillCreatedDialog(bill: bill),
+      );
+      if (!mounted) return;
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => SplitBillDetailScreen(billCode: bill.billCode),
+        ),
+      );
+    } on ApiException catch (err) {
+      _showError(err.message);
+    } finally {
+      if (mounted) setState(() => _isCreating = false);
+    }
   }
 
   @override
@@ -300,8 +309,7 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                   ),
                   const SizedBox(height: 16),
                   if (_mode == _SplitMode.even) ...[
-                    Text('参加者',
-                        style: Theme.of(context).textTheme.titleMedium),
+                    Text('参加者', style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _countController,
@@ -327,13 +335,30 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                       },
                     ),
                   ] else
-                    WeightedSplitEditor(
-                      currency: _currency,
-                      totalAmount: _enteredAmount,
-                      groups: _groups,
-                      onChanged: (groups) => setState(() => _groups = groups),
-                      unit: _unit,
-                      onUnitChanged: (unit) => setState(() => _unit = unit),
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _amountController,
+                      builder: (context, amountValue, _) {
+                        final amount = int.tryParse(amountValue.text.trim());
+                        return ValueListenableBuilder<List<SplitGroup>>(
+                          valueListenable: _groupsNotifier,
+                          builder: (context, groups, _) {
+                            return ValueListenableBuilder<int>(
+                              valueListenable: _unitNotifier,
+                              builder: (context, unit, _) =>
+                                  WeightedSplitEditor(
+                                currency: _currency,
+                                totalAmount: amount,
+                                groups: groups,
+                                onChanged: (value) =>
+                                    _groupsNotifier.value = value,
+                                unit: unit,
+                                onUnitChanged: (value) =>
+                                    _unitNotifier.value = value,
+                              ),
+                            );
+                          },
+                        );
+                      },
                     ),
                   const SizedBox(height: 24),
                   FilledButton.icon(
@@ -348,21 +373,9 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.call_split),
-                    label: const Text('割り勘を作成'),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: _isCreating ? null : _createRankedTest,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    label: Text(
+                      _mode == _SplitMode.weighted ? '傾斜つき割り勘リンクを作成' : '割り勘を作成',
                     ),
-                    icon: const Icon(Icons.workspace_premium_outlined),
-                    label: const Text('ランクごとのリンク作成（テスト）'),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'テスト設定: Aランク 5,000円 / Bランク 3,000円 / Cランク 1,000円',
-                    textAlign: TextAlign.center,
                   ),
                 ],
               ),
@@ -467,7 +480,8 @@ class _SplitBillCreatedDialog extends StatelessWidget {
           Text(
             'このコードを参加者に伝えてください。'
             '参加者が「割り勘に参加」でコードを入力すると、'
-            '${formatMoney(bill.currency, bill.shareAmount)} の請求が届きます。',
+            '${bill.isRanked ? '選択した区分に応じた金額' : formatMoney(bill.currency, bill.shareAmount)}'
+            ' の請求が届きます。',
             style: theme.textTheme.bodySmall,
             textAlign: TextAlign.center,
           ),

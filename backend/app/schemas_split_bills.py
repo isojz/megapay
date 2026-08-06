@@ -31,6 +31,18 @@ class RankedSplitBillTestCreate(BaseModel):
     participant_count: int = Field(ge=2, le=100)
 
 
+class RankedSplitBillRankCreate(BaseModel):
+    label: str = Field(min_length=1, max_length=50)
+    amount: Decimal = Field(gt=0)
+    capacity: int = Field(ge=1, le=99)
+
+
+class RankedSplitBillCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=100)
+    currency: str = Field(default="JPY", pattern=r"^[A-Za-z0-9]{3,10}$")
+    ranks: list[RankedSplitBillRankCreate] = Field(min_length=1, max_length=20)
+
+
 class RankedSplitBillJoin(BaseModel):
     rank_code: str = Field(min_length=1, max_length=20)
 
@@ -40,6 +52,7 @@ class SplitBillRank(BaseModel):
     label: str
     amount: str
     display_order: int
+    capacity: int | None = None
 
 
 class SplitBillResponse(BaseModel):

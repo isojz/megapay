@@ -8,18 +8,21 @@ class SplitBillRank {
     required this.label,
     required this.amount,
     required this.displayOrder,
+    this.capacity,
   });
 
   final String rankCode;
   final String label;
   final String amount;
   final int displayOrder;
+  final int? capacity;
 
   factory SplitBillRank.fromJson(Map<String, dynamic> json) => SplitBillRank(
         rankCode: json['rank_code'] as String,
         label: json['label'] as String,
         amount: json['amount'] as String,
         displayOrder: json['display_order'] as int,
+        capacity: json['capacity'] as int?,
       );
 }
 

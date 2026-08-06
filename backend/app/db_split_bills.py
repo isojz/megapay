@@ -54,6 +54,19 @@ def create_ranked_split_bill_test(
     return res.data
 
 
+def create_ranked_split_bill(
+    token: str,
+    title: str,
+    currency: str,
+    ranks: list[dict[str, Any]],
+) -> dict[str, Any]:
+    res = _client(token).rpc(
+        "create_ranked_split_bill",
+        {"p_title": title, "p_currency": currency, "p_ranks": ranks},
+    ).execute()
+    return res.data
+
+
 def find_split_bill(token: str, code: str) -> dict[str, Any]:
     res = _client(token).rpc("find_split_bill", {"p_code": code}).execute()
     return res.data

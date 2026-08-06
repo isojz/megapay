@@ -354,3 +354,48 @@ def test_join_ranked_split_bill(client, monkeypatch):
     assert res.status_code == 200
     assert captured == {"code": "SR-ABCD2345", "rank_code": "A"}
     assert res.json()["my_request_code"] == "RQ-RANK1234"
+
+
+def test_create_ranked_split_bill_from_weighted_groups(client, monkeypatch):
+    captured = {}
+
+    def fake_create(token, title, currency, ranks):
+        captured.update(title=title, currency=currency, ranks=ranks)
+        return _bill_json(
+            bill_code="SR-WEIGHT12",
+            title=title,
+            currency=currency,
+            total_amount="30000",
+            participant_count=6,
+            allocation_mode="ranked",
+            ranks=[
+                {
+                    "rank_code": "G1",
+                    "label": rank["label"],
+                    "amount": rank["amount"],
+                    "capacity": rank["capacity"],
+                    "display_order": index + 1,
+                }
+                for index, rank in enumerate(ranks)
+            ],
+        )
+
+    monkeypatch.setattr(db, "create_ranked_split_bill", fake_create)
+    payload = {
+        "title": " 傾斜飲み会 ",
+        "currency": "jpy",
+        "ranks": [
+            {"label": "先輩", "amount": "8000", "capacity": 2},
+            {"label": "後輩", "amount": "4666", "capacity": 3},
+        ],
+    }
+    res = client.post(f"{BASE}/ranked", json=payload)
+    assert res.status_code == 201
+    assert captured["title"] == "傾斜飲み会"
+    assert captured["currency"] == "JPY"
+    assert captured["ranks"][0] == {
+        "label": "先輩",
+        "amount": "8000",
+        "capacity": 2,
+    }
+    assert res.json()["allocation_mode"] == "ranked"

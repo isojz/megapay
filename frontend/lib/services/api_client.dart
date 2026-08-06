@@ -185,6 +185,19 @@ class ApiClient {
         }) as Map<String, dynamic>,
       );
 
+  Future<SplitBill> createRankedSplitBill({
+    required String title,
+    required String currency,
+    required List<Map<String, dynamic>> ranks,
+  }) async =>
+      SplitBill.fromJson(
+        await _post('/api/v1/split-bills/ranked', {
+          'title': title,
+          'currency': currency,
+          'ranks': ranks,
+        }) as Map<String, dynamic>,
+      );
+
   /// 割り勘リンク用の限定情報を取得する（ログイン不要）
   Future<PublicSplitBill> lookupPublicSplitBill(String billCode) async =>
       PublicSplitBill.fromJson(

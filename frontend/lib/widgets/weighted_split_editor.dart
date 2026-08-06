@@ -103,7 +103,7 @@ class WeightedSplitEditor extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: Text('グループ', style: theme.textTheme.titleMedium),
+              child: Text('支払い者グループ', style: theme.textTheme.titleMedium),
             ),
             TextButton.icon(
               onPressed: () => _selectPreset(context),
@@ -113,7 +113,7 @@ class WeightedSplitEditor extends StatelessWidget {
           ],
         ),
         Text(
-          '同じ負担にする人をまとめて、人数と重みを決めます',
+          '集金者を除き、同じ負担にする支払い者をまとめて人数と重みを決めます',
           style: theme.textTheme.bodySmall
               ?.copyWith(color: theme.colorScheme.outline),
         ),
@@ -267,12 +267,12 @@ class _GroupRowState extends State<_GroupRow> {
                     suffix: '人',
                     value: group.count.toString(),
                     onDecrease: group.count > 1
-                        ? () => widget.onChanged(
-                            group.copyWith(count: group.count - 1))
+                        ? () => widget
+                            .onChanged(group.copyWith(count: group.count - 1))
                         : null,
                     onIncrease: group.count < 99
-                        ? () => widget.onChanged(
-                            group.copyWith(count: group.count + 1))
+                        ? () => widget
+                            .onChanged(group.copyWith(count: group.count + 1))
                         : null,
                     onSubmitted: (text) {
                       final count = int.tryParse(text);
@@ -430,7 +430,7 @@ class _ResultCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '合計 ${result.totalCount} 人',
+                    '支払い者 合計 ${result.totalCount} 人',
                     style: theme.textTheme.titleSmall,
                   ),
                 ),
@@ -507,8 +507,8 @@ class _ResultRow extends StatelessWidget {
         ),
         Text(
           formatMoney(currency, result.totalAmount.toString()),
-          style: theme.textTheme.titleSmall
-              ?.copyWith(fontWeight: FontWeight.bold),
+          style:
+              theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
         ),
       ],
     );
