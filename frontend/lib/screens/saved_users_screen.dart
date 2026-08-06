@@ -153,10 +153,16 @@ class _SavedUsersScreenState extends State<SavedUsersScreen> {
                   Expanded(
                     child: TextField(
                       controller: _searchController,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'ユーザーID',
                         hintText: 'MP-12345678',
-                        border: OutlineInputBorder(),
+                        hintStyle: TextStyle(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant
+                              .withValues(alpha: 0.45),
+                        ),
+                        border: const OutlineInputBorder(),
                       ),
                       onSubmitted: (_) => _search(),
                     ),
@@ -188,8 +194,7 @@ class _SavedUsersScreenState extends State<SavedUsersScreen> {
                 ),
               ],
               const SizedBox(height: 24),
-              Text('保存済みユーザー',
-                  style: Theme.of(context).textTheme.titleMedium),
+              Text('保存済みユーザー', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
               FutureBuilder<List<SavedUser>>(
                 future: _future,
@@ -246,9 +251,7 @@ class _UserTile extends StatelessWidget {
       child: ListTile(
         leading: CircleAvatar(
           child: Text(
-            user.displayName.isEmpty
-                ? '?'
-                : user.displayName.characters.first,
+            user.displayName.isEmpty ? '?' : user.displayName.characters.first,
           ),
         ),
         title: Text('${user.displayName} さん'),
