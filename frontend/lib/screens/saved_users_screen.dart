@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/models.dart';
 import '../services/api_client.dart';
+import 'request_create_screen.dart';
 import 'transfer_screen.dart';
 
 class SavedUsersScreen extends StatefulWidget {
@@ -89,6 +90,51 @@ class _SavedUsersScreenState extends State<SavedUsersScreen> {
     if (sent == true && mounted) Navigator.of(context).pop(true);
   }
 
+  Future<void> _requestFrom(RecipientInfo user) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RequestCreateScreen(initialPayer: user),
+      ),
+    );
+  }
+
+  /// 相手を選んだあとに、送金と請求のどちらを行うかを選ぶ。
+  Future<void> _selectAction(RecipientInfo user) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text('${user.displayName} さん'),
+              subtitle: Text(user.userId),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.send_outlined),
+              title: const Text('送金する'),
+              subtitle: const Text('この相手にお金を送る'),
+              onTap: () => Navigator.of(context).pop('send'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.receipt_long),
+              title: const Text('請求する'),
+              subtitle: const Text('この相手に支払いをお願いする'),
+              onTap: () => Navigator.of(context).pop('request'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    if (action == 'send') {
+      await _sendTo(user);
+    } else {
+      await _requestFrom(user);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -133,7 +179,7 @@ class _SavedUsersScreenState extends State<SavedUsersScreen> {
                 const SizedBox(height: 8),
                 _UserTile(
                   user: _searchResult!,
-                  onSend: () => _sendTo(_searchResult!),
+                  onSelect: () => _selectAction(_searchResult!),
                   trailing: IconButton(
                     tooltip: '保存',
                     onPressed: _saving ? null : () => _save(_searchResult!),
@@ -171,7 +217,7 @@ class _SavedUsersScreenState extends State<SavedUsersScreen> {
                     children: users
                         .map((user) => _UserTile(
                               user: user,
-                              onSend: () => _sendTo(user),
+                              onSelect: () => _selectAction(user),
                             ))
                         .toList(),
                   );
@@ -186,10 +232,12 @@ class _SavedUsersScreenState extends State<SavedUsersScreen> {
 }
 
 class _UserTile extends StatelessWidget {
-  const _UserTile({required this.user, required this.onSend, this.trailing});
+  const _UserTile({required this.user, required this.onSelect, this.trailing});
 
   final RecipientInfo user;
-  final VoidCallback onSend;
+
+  /// タップ時に送金・請求の選択肢を出す
+  final VoidCallback onSelect;
   final Widget? trailing;
 
   @override
@@ -206,7 +254,7 @@ class _UserTile extends StatelessWidget {
         title: Text('${user.displayName} さん'),
         subtitle: Text(user.userId),
         trailing: trailing ?? const Icon(Icons.chevron_right),
-        onTap: onSend,
+        onTap: onSelect,
       ),
     );
   }
