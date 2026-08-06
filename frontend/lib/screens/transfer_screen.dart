@@ -269,8 +269,7 @@ class _TransferScreenState extends State<TransferScreen> {
                         const TextInputType.numberWithOptions(decimal: true),
                     decoration: const InputDecoration(
                       labelText: '送金金額',
-                      prefixText: '¥ ',
-                      suffixText: 'JPY',
+                      suffixText: '円',
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
