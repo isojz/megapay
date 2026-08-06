@@ -158,29 +158,31 @@ class _HomeScreenState extends State<HomeScreen> {
           final data = snapshot.data!;
           // 画面が低い端末ではセクション間の余白を詰め、
           // メニュー（ユーザー一覧まで）が一画面に収まりやすいようにする。
-          final gap = ((MediaQuery.sizeOf(context).height - 640) / 260)
-                      .clamp(0.0, 1.0) *
-                  12 +
-              12;
+          final density =
+              ((MediaQuery.sizeOf(context).height - 640) / 260).clamp(0.0, 1.0);
+          // アカウント〜残高〜メニューは続けて見せたいので詰める
+          final tightGap = 8 + density * 6;
+          // 履歴は別のまとまりなので少し離す
+          final gap = 12 + density * 12;
           return RefreshIndicator(
             onRefresh: _reload,
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
+                constraints: const BoxConstraints(maxWidth: 560),
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.fromLTRB(16, gap, 16, 96),
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
                   children: [
                     _ProfileCard(profile: data.profile),
-                    SizedBox(height: gap),
+                    SizedBox(height: tightGap),
                     Text('残高', style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     ...data.balances.map((b) => _BalanceTile(balance: b)),
                     if (data.balances.isEmpty)
                       const Card(
                         child: ListTile(title: Text('残高がありません')),
                       ),
-                    SizedBox(height: gap),
+                    SizedBox(height: tightGap),
                     PaymentRequestActions(
                       balances: data.balances,
                       onChanged: _reload,
