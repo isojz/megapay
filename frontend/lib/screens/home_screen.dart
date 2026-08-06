@@ -300,7 +300,7 @@ try {
                       profile: data.profile,
                       onAvatarTap: () => _selectAvatar(data.profile),
                     ),
-                    SizedBox(height: tightgap),
+                    SizedBox(height: tightGap),
 
                     Text('残高', style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 6),
