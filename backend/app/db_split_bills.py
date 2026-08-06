@@ -44,6 +44,16 @@ def create_split_bill(
     return res.data
 
 
+def create_ranked_split_bill_test(
+    token: str, title: str, participant_count: int
+) -> dict[str, Any]:
+    res = _client(token).rpc(
+        "create_ranked_split_bill_test",
+        {"p_title": title, "p_participant_count": participant_count},
+    ).execute()
+    return res.data
+
+
 def find_split_bill(token: str, code: str) -> dict[str, Any]:
     res = _client(token).rpc("find_split_bill", {"p_code": code}).execute()
     return res.data
@@ -51,6 +61,16 @@ def find_split_bill(token: str, code: str) -> dict[str, Any]:
 
 def join_split_bill(token: str, code: str) -> dict[str, Any]:
     res = _client(token).rpc("join_split_bill", {"p_code": code}).execute()
+    return res.data
+
+
+def join_ranked_split_bill(
+    token: str, code: str, rank_code: str
+) -> dict[str, Any]:
+    res = _client(token).rpc(
+        "join_ranked_split_bill",
+        {"p_code": code, "p_rank_code": rank_code},
+    ).execute()
     return res.data
 
 

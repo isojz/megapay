@@ -28,6 +28,8 @@ class MegaPayApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final splitCode = Uri.base.queryParameters['split_code']?.trim();
+    final rankedSplitCode =
+        Uri.base.queryParameters['ranked_split_code']?.trim();
     return MaterialApp(
       title: 'MegaPay',
       debugShowCheckedModeBanner: false,
@@ -35,9 +37,14 @@ class MegaPayApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0D47A1)),
         useMaterial3: true,
       ),
-      home: splitCode != null && splitCode.isNotEmpty
-          ? SplitBillLinkFlowScreen(billCode: splitCode)
-          : const AuthGate(),
+      home: rankedSplitCode != null && rankedSplitCode.isNotEmpty
+          ? SplitBillLinkFlowScreen(
+              billCode: rankedSplitCode,
+              ranked: true,
+            )
+          : splitCode != null && splitCode.isNotEmpty
+              ? SplitBillLinkFlowScreen(billCode: splitCode)
+              : const AuthGate(),
     );
   }
 }

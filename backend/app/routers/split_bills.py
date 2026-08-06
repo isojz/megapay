@@ -6,6 +6,8 @@ from ..auth import AuthUser, get_current_user
 from ..errors import to_http_exception
 from ..schemas_split_bills import (
     PublicSplitBillResponse,
+    RankedSplitBillJoin,
+    RankedSplitBillTestCreate,
     SplitBillCreate,
     SplitBillParticipant,
     SplitBillResponse,
@@ -37,6 +39,24 @@ def create_split_bill(
             body.currency.upper(),
             body.total_amount,
             body.participant_count,
+        )
+    except APIError as err:
+        raise to_http_exception(err) from err
+    return SplitBillResponse(**data)
+
+
+@router.post(
+    "/ranked-test",
+    response_model=SplitBillResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_ranked_split_bill_test(
+    body: RankedSplitBillTestCreate,
+    user: AuthUser = Depends(get_current_user),
+) -> SplitBillResponse:
+    try:
+        data = db.create_ranked_split_bill_test(
+            user.token, body.title.strip(), body.participant_count
         )
     except APIError as err:
         raise to_http_exception(err) from err
@@ -81,6 +101,21 @@ def join_split_bill(
     """
     try:
         data = db.join_split_bill(user.token, bill_code.strip())
+    except APIError as err:
+        raise to_http_exception(err) from err
+    return SplitBillResponse(**data)
+
+
+@router.post("/{bill_code}/join-ranked", response_model=SplitBillResponse)
+def join_ranked_split_bill(
+    bill_code: str,
+    body: RankedSplitBillJoin,
+    user: AuthUser = Depends(get_current_user),
+) -> SplitBillResponse:
+    try:
+        data = db.join_ranked_split_bill(
+            user.token, bill_code.strip(), body.rank_code.strip()
+        )
     except APIError as err:
         raise to_http_exception(err) from err
     return SplitBillResponse(**data)
