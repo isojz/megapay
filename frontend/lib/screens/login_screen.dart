@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// ログイン / 口座開設（サインアップ）画面。
+import '../theme.dart';
+import '../utils/input_formatters.dart';
+
+/// ログイン / アカウント開設（サインアップ）画面。
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, this.onAuthenticated});
 
@@ -23,6 +26,9 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isSignUp = false;
   bool _isLoading = false;
   bool _rememberLogin = true;
+
+  /// パスワードは既定で伏せ、目のボタンで表示を切り替える。
+  bool _passwordVisible = false;
 
   @override
   void initState() {
@@ -116,8 +122,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.currency_exchange,
-                      size: 64, color: Color(0xFF0D47A1)),
+                  // 背景がグレーなので、白いアイコンはブランドカラーの円に載せる
+                  const CircleAvatar(
+                    radius: 40,
+                    backgroundColor: megaPayBrandColor,
+                    child: Icon(
+                      Icons.currency_exchange,
+                      size: 44,
+                      color: megaPayOnBrandColor,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     'MegaPay',
@@ -128,7 +142,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    '手軽に、どの通貨でも送金',
+                    'いつでもどこでも手軽に割り勘',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
@@ -151,6 +165,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
+                    inputFormatters: emailInputFormatters,
                     textInputAction: TextInputAction.next,
                     decoration: const InputDecoration(
                       labelText: 'メールアドレス',
@@ -164,10 +179,21 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _passwordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
+                    obscureText: !_passwordVisible,
+                    decoration: InputDecoration(
                       labelText: 'パスワード（6文字以上）',
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        tooltip: _passwordVisible ? 'パスワードを隠す' : 'パスワードを表示',
+                        icon: Icon(
+                          _passwordVisible
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                        ),
+                        onPressed: () => setState(
+                          () => _passwordVisible = !_passwordVisible,
+                        ),
+                      ),
                     ),
                     validator: (value) => (value == null || value.length < 6)
                         ? 'パスワードは6文字以上で入力してください'
@@ -201,15 +227,15 @@ class _LoginScreenState extends State<LoginScreen> {
                             width: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(_isSignUp ? '口座を開設する（無料）' : 'ログイン'),
+                        : Text(_isSignUp ? 'アカウント開設（無料）' : 'ログイン'),
                   ),
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: _isLoading
                         ? null
                         : () => setState(() => _isSignUp = !_isSignUp),
-                    child: Text(
-                        _isSignUp ? 'アカウントをお持ちの方はログイン' : '初めての方は口座開設（サインアップ）'),
+                    child:
+                        Text(_isSignUp ? 'アカウントをお持ちの方はログイン' : '初めての方はアカウント開設'),
                   ),
                 ],
               ),

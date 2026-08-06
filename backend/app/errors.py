@@ -17,6 +17,8 @@ _DB_ERROR_MAP: dict[str, tuple[int, str]] = {
     # 割り勘機能
     "SPLIT_BILL_NOT_FOUND": (status.HTTP_404_NOT_FOUND, "請求コードが見つかりません"),
     "SPLIT_BILL_FULL": (status.HTTP_409_CONFLICT, "参加人数の上限に達しています"),
+    "INVALID_SPLIT_BILL_RANK": (status.HTTP_400_BAD_REQUEST, "支払いランクが不正です"),
+    "SPLIT_BILL_RANK_FULL": (status.HTTP_409_CONFLICT, "この支払い区分は定員に達しています"),
     "ORGANIZER_CANNOT_JOIN": (status.HTTP_400_BAD_REQUEST, "集金者はグループに参加できません"),
     "INVALID_PARTICIPANT_COUNT": (status.HTTP_400_BAD_REQUEST, "参加人数が不正です"),
     "INVALID_TITLE": (status.HTTP_400_BAD_REQUEST, "イベント名を入力してください"),
@@ -30,4 +32,13 @@ def to_http_exception(err: APIError) -> HTTPException:
     for keyword, (status_code, detail) in _DB_ERROR_MAP.items():
         if keyword in message:
             return HTTPException(status_code, detail)
+
+    # 呼び出そうとした DB 関数が存在しない場合。マイグレーションの適用漏れで
+    # 起きるため、DB の一般的なエラーとは区別して原因が分かるようにする。
+    if "Could not find the function" in message or "PGRST202" in message:
+        return HTTPException(
+            status.HTTP_501_NOT_IMPLEMENTED,
+            "この機能はまだ利用できません（データベースの更新が必要です）",
+        )
+
     return HTTPException(status.HTTP_502_BAD_GATEWAY, "データベース処理でエラーが発生しました")

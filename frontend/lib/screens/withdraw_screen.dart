@@ -16,21 +16,14 @@ class WithdrawScreen extends StatefulWidget {
 }
 
 class _WithdrawScreenState extends State<WithdrawScreen> {
-  String? _selectedCurrency;
+  /// 現在は日本円のみ出金できる。
+  static const _currency = 'JPY';
+
   String? _selectedMethod;
-
-  @override
-  void initState() {
-    super.initState();
-
-    if (widget.balances.isNotEmpty) {
-      _selectedCurrency = widget.balances.first.currency;
-    }
-  }
 
   Balance? get _selectedBalance {
     for (final balance in widget.balances) {
-      if (balance.currency == _selectedCurrency) {
+      if (balance.currency == _currency) {
         return balance;
       }
     }
@@ -45,15 +38,6 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
   }
 
   void _goNext() {
-    if (_selectedCurrency == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('出金する通貨を選択してください'),
-        ),
-      );
-      return;
-    }
-
     if (_selectedMethod == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -86,32 +70,6 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Text(
-                '出金する通貨',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedCurrency,
-                decoration: const InputDecoration(
-                  labelText: '通貨',
-                  border: OutlineInputBorder(),
-                ),
-                items: widget.balances
-                    .map(
-                      (balance) => DropdownMenuItem<String>(
-                        value: balance.currency,
-                        child: Text(balance.currency),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedCurrency = value;
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -211,9 +169,7 @@ class _WithdrawMethodButton extends StatelessWidget {
                 ? theme.colorScheme.primary
                 : theme.colorScheme.outline,
           ),
-          backgroundColor: selected
-              ? theme.colorScheme.primaryContainer
-              : null,
+          backgroundColor: selected ? theme.colorScheme.primaryContainer : null,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),

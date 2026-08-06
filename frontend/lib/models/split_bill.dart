@@ -2,6 +2,30 @@
 /// 金額は桁落ち防止のため API 上は文字列で受け渡しする（表示時のみ数値化）。
 library;
 
+class SplitBillRank {
+  const SplitBillRank({
+    required this.rankCode,
+    required this.label,
+    required this.amount,
+    required this.displayOrder,
+    this.capacity,
+  });
+
+  final String rankCode;
+  final String label;
+  final String amount;
+  final int displayOrder;
+  final int? capacity;
+
+  factory SplitBillRank.fromJson(Map<String, dynamic> json) => SplitBillRank(
+        rankCode: json['rank_code'] as String,
+        label: json['label'] as String,
+        amount: json['amount'] as String,
+        displayOrder: json['display_order'] as int,
+        capacity: json['capacity'] as int?,
+      );
+}
+
 class PublicSplitBill {
   const PublicSplitBill({
     required this.billCode,
@@ -11,6 +35,8 @@ class PublicSplitBill {
     required this.participantCount,
     required this.shareAmount,
     required this.organizerName,
+    this.allocationMode = 'equal',
+    this.ranks = const [],
   });
 
   final String billCode;
@@ -20,6 +46,9 @@ class PublicSplitBill {
   final int participantCount;
   final String shareAmount;
   final String organizerName;
+  final String allocationMode;
+  final List<SplitBillRank> ranks;
+  bool get isRanked => allocationMode == 'ranked';
 
   factory PublicSplitBill.fromJson(Map<String, dynamic> json) =>
       PublicSplitBill(
@@ -30,6 +59,10 @@ class PublicSplitBill {
         participantCount: json['participant_count'] as int,
         shareAmount: json['share_amount'] as String,
         organizerName: json['organizer_name'] as String? ?? '',
+        allocationMode: json['allocation_mode'] as String? ?? 'equal',
+        ranks: (json['ranks'] as List? ?? const [])
+            .map((e) => SplitBillRank.fromJson(e as Map<String, dynamic>))
+            .toList(),
       );
 }
 
@@ -51,6 +84,8 @@ class SplitBill {
     required this.createdAt,
     this.myRequestCode,
     this.myStatus,
+    this.allocationMode = 'equal',
+    this.ranks = const [],
   });
 
   /// 参加用の請求コード（SP-XXXXXXXX）
@@ -77,6 +112,9 @@ class SplitBill {
   /// 参加済みなら自分あての請求コードと状態
   final String? myRequestCode;
   final String? myStatus; // "pending" / "paid" / "cancelled"
+  final String allocationMode;
+  final List<SplitBillRank> ranks;
+  bool get isRanked => allocationMode == 'ranked';
 
   final int joinedCount;
   final int paidCount;
@@ -112,6 +150,10 @@ class SplitBill {
         joined: json['joined'] as bool,
         myRequestCode: json['my_request_code'] as String?,
         myStatus: json['my_status'] as String?,
+        allocationMode: json['allocation_mode'] as String? ?? 'equal',
+        ranks: (json['ranks'] as List? ?? const [])
+            .map((e) => SplitBillRank.fromJson(e as Map<String, dynamic>))
+            .toList(),
         joinedCount: json['joined_count'] as int,
         paidCount: json['paid_count'] as int,
         collectedAmount: json['collected_amount'] as String,
@@ -131,6 +173,9 @@ class SplitBillParticipant {
     required this.joinedAt,
     this.paymentMethod = 'balance',
     this.paidAt,
+    this.rankCode,
+    this.rankLabel,
+    this.rankAmount,
   });
 
   final String userId;
@@ -145,6 +190,9 @@ class SplitBillParticipant {
   final DateTime? paidAt;
   final bool isMe;
   final DateTime joinedAt;
+  final String? rankCode;
+  final String? rankLabel;
+  final String? rankAmount;
 
   bool get isPaid => status == 'paid';
   bool get isPaidByCash => isPaid && paymentMethod == 'cash';
@@ -164,5 +212,8 @@ class SplitBillParticipant {
             : DateTime.parse(json['paid_at'] as String).toLocal(),
         isMe: json['is_me'] as bool,
         joinedAt: DateTime.parse(json['joined_at'] as String).toLocal(),
+        rankCode: json['rank_code'] as String?,
+        rankLabel: json['rank_label'] as String?,
+        rankAmount: json['rank_amount'] as String?,
       );
 }

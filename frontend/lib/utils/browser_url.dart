@@ -1,10 +1,12 @@
 import 'package:web/web.dart' as web;
 
 /// 現在のアプリURLを基準に、割り勘コード入りの共有リンクを作る。
-String buildSplitBillPaymentLink(String billCode) {
+String buildSplitBillPaymentLink(String billCode, {bool ranked = false}) {
   final current = Uri.parse(web.window.location.href);
   final parameters = Map<String, String>.from(current.queryParameters)
-    ..['split_code'] = billCode;
+    ..remove('split_code')
+    ..remove('ranked_split_code')
+    ..[ranked ? 'ranked_split_code' : 'split_code'] = billCode;
   return current.replace(queryParameters: parameters, fragment: '').toString();
 }
 

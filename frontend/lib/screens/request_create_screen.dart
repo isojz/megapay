@@ -5,6 +5,8 @@ import '../models/models.dart';
 import '../models/payment_request.dart';
 import '../services/api_client.dart';
 import '../utils/money.dart';
+import '../widgets/saved_user_picker.dart';
+import '../utils/input_formatters.dart';
 
 /// 請求作成画面：相手のユーザーIDを指定して請求し、支払い用の請求コードを発行する。
 class RequestCreateScreen extends StatefulWidget {
@@ -29,6 +31,9 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
   bool _isLookingUp = false;
   bool _isCreating = false;
 
+  /// 自分自身への請求を送信前に弾くために保持する。
+  String? _myUserId;
+
   @override
   void initState() {
     super.initState();
@@ -37,6 +42,24 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
       _payerController.text = payer.userId;
       _verifiedPayer = payer;
     }
+    _loadMyUserId();
+  }
+
+  Future<void> _loadMyUserId() async {
+    try {
+      final profile = await ApiClient.instance.fetchProfile();
+      if (mounted) setState(() => _myUserId = profile.userId);
+    } on ApiException {
+      // 取得できなくてもサーバー側で弾かれるため、ここでは何もしない
+    }
+  }
+
+  /// 入力されたユーザーIDが自分自身かどうか。
+  /// ユーザーIDは大文字で扱われるため、比較時に揃える。
+  bool _isMyself(String userId) {
+    final myUserId = _myUserId;
+    return myUserId != null &&
+        userId.trim().toUpperCase() == myUserId.toUpperCase();
   }
 
   @override
@@ -58,12 +81,28 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
     );
   }
 
+  /// ユーザー一覧から請求先を選ぶ。保存済みユーザーは表示名も分かっているため、
+  /// 選んだ時点で確認済みとして扱う。
+  Future<void> _pickFromSavedUsers() async {
+    final picked = await SavedUserPicker.show(context);
+    if (picked == null || !mounted) return;
+    setState(() {
+      _payerController.text = picked.userId;
+      _verifiedPayer = picked;
+    });
+  }
+
   /// 請求先のユーザーIDから相手を検索して表示名を確認する。
   Future<RecipientInfo?> _lookupPayer() async {
     final payerId = _payerController.text.trim();
 
     if (payerId.isEmpty) {
       _showError('請求先のユーザーIDを入力してください');
+      return null;
+    }
+
+    if (_isMyself(payerId)) {
+      _showError('自分自身には請求できません');
       return null;
     }
 
@@ -211,23 +250,26 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _payerController,
-                          decoration: InputDecoration(
+                          decoration: const InputDecoration(
                             labelText: '相手のユーザーID',
                             hintText: 'MP-12345678',
-                            hintStyle: TextStyle(
-                              color: theme.colorScheme.onSurfaceVariant
-                                  .withValues(alpha: 0.45),
-                            ),
-                            border: const OutlineInputBorder(),
+                            border: OutlineInputBorder(),
                           ),
+                          inputFormatters: userIdInputFormatters,
                           onChanged: (_) {
                             if (_verifiedPayer != null) {
                               setState(() => _verifiedPayer = null);
                             }
                           },
                           validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
+                            final userId = value?.trim() ?? '';
+
+                            if (userId.isEmpty) {
                               return '請求先のユーザーIDを入力してください';
+                            }
+
+                            if (_isMyself(userId)) {
+                              return '自分自身には請求できません';
                             }
 
                             return null;
@@ -252,8 +294,15 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
                       ),
                     ],
                   ),
-                  if (_verifiedPayer != null) ...[
-                    const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _pickFromSavedUsers,
+                      icon: const Icon(Icons.people_outline),
+                      label: const Text('ユーザー一覧から選ぶ'),
+                    ),
+                  ),
+                  if (_verifiedPayer != null)
                     Card(
                       color: Colors.green.shade50,
                       child: ListTile(
@@ -267,7 +316,6 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
                         subtitle: Text(_verifiedPayer!.userId),
                       ),
                     ),
-                  ],
                   const SizedBox(height: 24),
                   Text(
                     '金額',
@@ -279,10 +327,10 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
+                    inputFormatters: decimalAmountInputFormatters,
                     decoration: const InputDecoration(
                       labelText: '請求金額',
-                      prefixText: '¥ ',
-                      suffixText: 'JPY',
+                      suffixText: '円',
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {

@@ -132,6 +132,17 @@ class ApiClient {
         ) as Map<String, dynamic>,
       );
 
+  /// PayPay・カードなどの外部決済で支払う。
+  /// 引き落としは外部の決済事業者側で行われる想定のため、自分の残高は減らない。
+  /// 集金者の残高と、双方の送金履歴には反映される。
+  Future<PaymentRequest> payPaymentRequestByExternal(String requestCode) async =>
+      PaymentRequest.fromJson(
+        await _post(
+          '/api/v1/payment-requests/${Uri.encodeComponent(requestCode)}/pay-external',
+          const {},
+        ) as Map<String, dynamic>,
+      );
+
   /// 現金で支払ったことを記録する（残高・送金履歴は変更されない）
   Future<PaymentRequest> payPaymentRequestByCash(String requestCode) async =>
       PaymentRequest.fromJson(
@@ -174,6 +185,30 @@ class ApiClient {
         }) as Map<String, dynamic>,
       );
 
+  Future<SplitBill> createRankedSplitBillTest({
+    required String title,
+    required int participantCount,
+  }) async =>
+      SplitBill.fromJson(
+        await _post('/api/v1/split-bills/ranked-test', {
+          'title': title,
+          'participant_count': participantCount,
+        }) as Map<String, dynamic>,
+      );
+
+  Future<SplitBill> createRankedSplitBill({
+    required String title,
+    required String currency,
+    required List<Map<String, dynamic>> ranks,
+  }) async =>
+      SplitBill.fromJson(
+        await _post('/api/v1/split-bills/ranked', {
+          'title': title,
+          'currency': currency,
+          'ranks': ranks,
+        }) as Map<String, dynamic>,
+      );
+
   /// 割り勘リンク用の限定情報を取得する（ログイン不要）
   Future<PublicSplitBill> lookupPublicSplitBill(String billCode) async =>
       PublicSplitBill.fromJson(
@@ -194,6 +229,17 @@ class ApiClient {
         await _post(
           '/api/v1/split-bills/${Uri.encodeComponent(billCode)}/join',
           const {},
+        ) as Map<String, dynamic>,
+      );
+
+  Future<SplitBill> joinRankedSplitBill(
+    String billCode,
+    String rankCode,
+  ) async =>
+      SplitBill.fromJson(
+        await _post(
+          '/api/v1/split-bills/${Uri.encodeComponent(billCode)}/join-ranked',
+          {'rank_code': rankCode},
         ) as Map<String, dynamic>,
       );
 
