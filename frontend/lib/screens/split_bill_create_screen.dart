@@ -50,6 +50,10 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
   /// 割り振りの単位。きりのよい金額にしやすいよう既定を 500 円にする。
   final _unitNotifier = ValueNotifier<int>(500);
 
+  /// 集金者（自分）が属するグループ。既定は先頭のグループに加わる。
+  /// null にすると集金者は割り勘に加わらない。
+  final _organizerGroupNotifier = ValueNotifier<int?>(0);
+
   /// 合計金額の入力欄の現在値（傾斜の割り振り表示に使う）
   int? get _enteredAmount => int.tryParse(_amountController.text.trim());
 
@@ -57,6 +61,7 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
   void dispose() {
     _groupsNotifier.dispose();
     _unitNotifier.dispose();
+    _organizerGroupNotifier.dispose();
     _titleController.dispose();
     _amountController.dispose();
     _countController.dispose();
@@ -120,7 +125,13 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
     final amount = _enteredAmount;
     final groups = _groupsNotifier.value;
     final unit = _unitNotifier.value;
-    final error = validateSplitGroups(groups);
+    // グループを減らしたあとに範囲外を指していないか確認する
+    final organizerIndex = _organizerGroupNotifier.value != null &&
+            _organizerGroupNotifier.value! < groups.length
+        ? _organizerGroupNotifier.value
+        : null;
+    final error =
+        validateSplitGroups(groups, organizerGroupIndex: organizerIndex);
     if (amount == null || amount <= 0) {
       _showError('合計金額を入力してください');
       return;
@@ -135,6 +146,7 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
       totalAmount: amount,
       groups: groups,
       unit: unit,
+      organizerGroupIndex: organizerIndex,
     );
     if (result.totalCount > _maxParticipants - 1) {
       _showError('支払い者は${_maxParticipants - 1}人までです');
@@ -176,13 +188,31 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
             const Divider(),
             Row(
               children: [
-                Expanded(child: Text('支払い者 ${result.totalCount} 人')),
+                Expanded(child: Text('合計 ${result.totalCount} 人')),
                 Text(
                   formatMoney(_currency, result.totalAmount.toString()),
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ],
             ),
+            if (result.includesOrganizer) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Expanded(child: Text('請求する分（${result.payerCount}人）')),
+                  Text(
+                    formatMoney(_currency, result.collectAmount.toString()),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              Text(
+                'あなたの負担 '
+                '${formatMoney(_currency, result.organizerAmount.toString())}'
+                'は請求されません',
+                style: const TextStyle(fontSize: 12),
+              ),
+            ],
           ],
         ),
         actions: [
@@ -199,21 +229,27 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
     );
     if (confirmed != true || !mounted) return;
 
+    // 集金者は自分に請求しないため、ランク（請求先の枠）から除く。
+    // 端数の 1 円を負担する枠も、集金者がいる場合は集金者が引き受ける。
     final ranks = <Map<String, dynamic>>[];
     for (final group in result.groups) {
-      final normalCount = group.group.count - (group.hasExtra ? 1 : 0);
+      final label = group.group.name.trim();
+      // 1 円多く払う人数（集金者がいるグループなら集金者が 1 人分を引き受ける）
+      final oddYenCount = (group.extraExtraCount - group.organizerCount)
+          .clamp(0, group.payerCount);
+      final normalCount = group.payerCount - oddYenCount;
       if (normalCount > 0) {
         ranks.add({
-          'label': group.group.name.trim(),
-          'amount': group.amountPerPerson.toString(),
+          'label': label,
+          'amount': group.amountWithExtra.toString(),
           'capacity': normalCount,
         });
       }
-      if (group.hasExtra) {
+      if (oddYenCount > 0) {
         ranks.add({
-          'label': '${group.group.name.trim()}（端数調整）',
-          'amount': group.amountWithExtra.toString(),
-          'capacity': 1,
+          'label': '$label（端数調整）',
+          'amount': group.amountWithExtraPlusOne.toString(),
+          'capacity': oddYenCount,
         });
       }
     }
@@ -345,15 +381,22 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                             return ValueListenableBuilder<int>(
                               valueListenable: _unitNotifier,
                               builder: (context, unit, _) =>
-                                  WeightedSplitEditor(
-                                currency: _currency,
-                                totalAmount: amount,
-                                groups: groups,
-                                onChanged: (value) =>
-                                    _groupsNotifier.value = value,
-                                unit: unit,
-                                onUnitChanged: (value) =>
-                                    _unitNotifier.value = value,
+                                  ValueListenableBuilder<int?>(
+                                valueListenable: _organizerGroupNotifier,
+                                builder: (context, organizerIndex, _) =>
+                                    WeightedSplitEditor(
+                                  currency: _currency,
+                                  totalAmount: amount,
+                                  groups: groups,
+                                  onChanged: (value) =>
+                                      _groupsNotifier.value = value,
+                                  unit: unit,
+                                  onUnitChanged: (value) =>
+                                      _unitNotifier.value = value,
+                                  organizerGroupIndex: organizerIndex,
+                                  onOrganizerGroupChanged: (value) =>
+                                      _organizerGroupNotifier.value = value,
+                                ),
                               ),
                             );
                           },
