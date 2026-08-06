@@ -34,42 +34,66 @@ class SplitGroupResult {
   const SplitGroupResult({
     required this.group,
     required this.amountPerPerson,
-    required this.extraPersonCount,
+    required this.extraAmount,
   });
 
   final SplitGroup group;
 
-  /// このグループの 1 人あたりの金額（端数調整前の基本額）
+  /// このグループの 1 人あたりの金額（割り振り単位で丸めた額）
   final int amountPerPerson;
 
-  /// 端数調整で 1 円だけ多く払う人数（0 ならグループ内は全員同額）
-  final int extraPersonCount;
+  /// 端数を引き受ける人が上乗せで負担する額。
+  /// 端数は重みがいちばん大きいグループの 1 人にまとめて寄せるため、
+  /// このグループが端数の引き受け先でなければ 0 になる。
+  final int extraAmount;
 
   /// このグループの合計金額
-  int get totalAmount => amountPerPerson * group.count + extraPersonCount;
+  int get totalAmount => amountPerPerson * group.count + extraAmount;
 
-  /// グループ内で金額に差が出ているか
-  bool get hasRounding => extraPersonCount > 0;
+  /// このグループに端数の引き受け役がいるか
+  bool get hasExtra => extraAmount > 0;
 
-  /// 端数を多く負担する人の金額
-  int get amountWithExtra => amountPerPerson + 1;
+  /// 端数を引き受ける人の金額
+  int get amountWithExtra => amountPerPerson + extraAmount;
 }
 
 /// 傾斜配分の計算結果。
 class SplitResult {
-  const SplitResult({required this.groups, required this.totalAmount});
+  const SplitResult({
+    required this.groups,
+    required this.totalAmount,
+    required this.unit,
+  });
 
   final List<SplitGroupResult> groups;
 
   /// 配分後の合計金額（入力した合計金額と必ず一致する）
   final int totalAmount;
 
+  /// 割り振りに使った単位（1 / 100 / 500 / 1000 円など）
+  final int unit;
+
   int get totalCount =>
       groups.fold(0, (sum, result) => sum + result.group.count);
 
-  /// 端数調整が発生しているか（発生していれば UI で補足を出す）
-  bool get hasRounding => groups.any((result) => result.hasRounding);
+  /// 端数の上乗せが発生しているか（発生していれば UI で補足を出す）
+  bool get hasExtra => groups.any((result) => result.hasExtra);
+
+  /// 端数を引き受けたグループ（いなければ null）
+  SplitGroupResult? get extraBearer {
+    for (final result in groups) {
+      if (result.hasExtra) return result;
+    }
+    return null;
+  }
+
+  /// 単位が大きすぎて 1 人あたり 0 円になったグループがあるか
+  bool get hasZeroAmount =>
+      groups.any((result) => result.amountPerPerson <= 0);
 }
+
+/// 割り振りの単位として選べる金額。
+const splitUnits = <int>[1, 100, 500, 1000];
 
 /// 傾斜配分の入力が正しいかを判定する。問題がなければ null を返す。
 String? validateSplitGroups(List<SplitGroup> groups) {
@@ -86,17 +110,26 @@ String? validateSplitGroups(List<SplitGroup> groups) {
 
 /// 合計金額をグループの重みに応じて配分する。
 ///
-/// 1 人あたりの金額は「合計 × 重み ÷ 重み付き人数の合計」を切り捨てた額を基本とし、
-/// 切り捨てで余った分は重みの大きいグループから 1 円ずつ割り当てる。
-/// これにより配分後の合計は必ず [totalAmount] と一致する。
+/// 1 人あたりの金額は「合計 × 重み ÷ 重み付き人数の合計」を [unit] 単位に切り捨てた額。
+/// 切り捨てで余った分（端数）は、重みがいちばん大きいグループの 1 人がまとめて負担する。
+/// これにより、ほとんどの人はきりのよい金額になり、配分後の合計は必ず [totalAmount] と一致する。
+///
+/// 例: 30,000 円 / 多め2人(重み2) + 少なめ3人(重み1) / 500 円単位
+///   多め   8,500 円（うち1人は 9,500 円）
+///   少なめ 4,000 円
+///   合計 30,000 円
 ///
 /// [groups] が不正な場合は [ArgumentError] を投げる（事前に [validateSplitGroups] で確認する）。
 SplitResult calculateWeightedSplit({
   required int totalAmount,
   required List<SplitGroup> groups,
+  int unit = 1,
 }) {
   if (totalAmount <= 0) {
     throw ArgumentError.value(totalAmount, 'totalAmount', '合計金額は1以上である必要があります');
+  }
+  if (unit < 1) {
+    throw ArgumentError.value(unit, 'unit', '割り振りの単位は1以上である必要があります');
   }
   final error = validateSplitGroups(groups);
   if (error != null) throw ArgumentError(error);
@@ -107,31 +140,24 @@ SplitResult calculateWeightedSplit({
     (sum, group) => sum + group.count * group.weight,
   );
 
-  // 1. 各グループの基本額（切り捨て）
-  final baseAmounts = groups
-      .map((group) => (totalAmount * group.weight / weightedCount).floor())
-      .toList();
+  // 1. 各グループの 1 人あたりの金額を unit 単位に切り捨てる
+  final baseAmounts = groups.map((group) {
+    final ideal = totalAmount * group.weight / weightedCount;
+    return (ideal / unit).floor() * unit;
+  }).toList();
 
-  // 2. 切り捨てで足りない分を求める
+  // 2. 切り捨てで足りない分（端数）を求める。切り捨てなので必ず 0 以上になる。
   var assigned = 0;
   for (var i = 0; i < groups.length; i++) {
     assigned += baseAmounts[i] * groups[i].count;
   }
-  var remainder = totalAmount - assigned;
+  final remainder = totalAmount - assigned;
 
-  // 3. 余りを重みの大きいグループから 1 人 1 円ずつ割り当てる
-  //    （重みが同じなら先に並んでいるグループを優先）
-  final extras = List.filled(groups.length, 0);
-  final order = List.generate(groups.length, (i) => i)
-    ..sort((a, b) {
-      final byWeight = groups[b].weight.compareTo(groups[a].weight);
-      return byWeight != 0 ? byWeight : a.compareTo(b);
-    });
-  for (final i in order) {
-    if (remainder <= 0) break;
-    final add = remainder < groups[i].count ? remainder : groups[i].count;
-    extras[i] = add;
-    remainder -= add;
+  // 3. 端数は重みがいちばん大きいグループの 1 人がまとめて引き受ける
+  //    （重みが同じなら先に並んでいるグループ）
+  var topIndex = 0;
+  for (var i = 1; i < groups.length; i++) {
+    if (groups[i].weight > groups[topIndex].weight) topIndex = i;
   }
 
   return SplitResult(
@@ -140,10 +166,11 @@ SplitResult calculateWeightedSplit({
         SplitGroupResult(
           group: groups[i],
           amountPerPerson: baseAmounts[i],
-          extraPersonCount: extras[i],
+          extraAmount: i == topIndex ? remainder : 0,
         ),
     ],
     totalAmount: totalAmount,
+    unit: unit,
   );
 }
 

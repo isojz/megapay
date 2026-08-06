@@ -15,6 +15,8 @@ class WeightedSplitEditor extends StatelessWidget {
     required this.totalAmount,
     required this.groups,
     required this.onChanged,
+    required this.unit,
+    required this.onUnitChanged,
   });
 
   final String currency;
@@ -24,6 +26,10 @@ class WeightedSplitEditor extends StatelessWidget {
 
   final List<SplitGroup> groups;
   final ValueChanged<List<SplitGroup>> onChanged;
+
+  /// 割り振りの単位（1 / 100 / 500 / 1000 円）
+  final int unit;
+  final ValueChanged<int> onUnitChanged;
 
   void _updateAt(int index, SplitGroup group) {
     final next = [...groups];
@@ -84,7 +90,11 @@ class WeightedSplitEditor extends StatelessWidget {
     final error = validateSplitGroups(groups);
     final amount = totalAmount;
     final result = (error == null && amount != null && amount > 0)
-        ? calculateWeightedSplit(totalAmount: amount, groups: groups)
+        ? calculateWeightedSplit(
+            totalAmount: amount,
+            groups: groups,
+            unit: unit,
+          )
         : null;
 
     return Column(
@@ -132,6 +142,25 @@ class WeightedSplitEditor extends StatelessWidget {
                 ?.copyWith(color: theme.colorScheme.error),
           ),
         ],
+        const SizedBox(height: 16),
+        Text('割り振りの単位', style: theme.textTheme.titleMedium),
+        Text(
+          'この単位できりよく割り振り、端数は重みがいちばん大きいグループの1人が負担します',
+          style: theme.textTheme.bodySmall
+              ?.copyWith(color: theme.colorScheme.outline),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          children: [
+            for (final value in splitUnits)
+              ChoiceChip(
+                selected: unit == value,
+                onSelected: (_) => onUnitChanged(value),
+                label: Text(value == 1 ? '1円単位' : '$value円単位'),
+              ),
+          ],
+        ),
         const SizedBox(height: 16),
         Text('割り振り', style: theme.textTheme.titleMedium),
         const SizedBox(height: 8),
@@ -412,10 +441,18 @@ class _ResultCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (result.hasRounding) ...[
+            if (result.hasZeroAmount) ...[
               const SizedBox(height: 8),
               Text(
-                '端数は重みの大きいグループから1円ずつ調整しています（合計はぴったり一致します）',
+                '単位が大きすぎて0円になるグループがあります。単位を小さくしてください',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.error),
+              ),
+            ] else if (result.hasExtra) ...[
+              const SizedBox(height: 8),
+              Text(
+                '端数 ${formatMoney(currency, result.extraBearer!.extraAmount.toString())} は'
+                '「${result.extraBearer!.group.name}」の1人が負担します（合計はぴったり一致します）',
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.outline),
               ),
@@ -437,11 +474,7 @@ class _ResultRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final group = result.group;
-    // 端数調整で 1 円多い人がいる場合は「3,333〜3,334円」のように幅で示す
-    final perPerson = result.hasRounding
-        ? '${formatMoney(currency, result.amountPerPerson.toString())}'
-            ' 〜 ${formatMoney(currency, result.amountWithExtra.toString())}'
-        : formatMoney(currency, result.amountPerPerson.toString());
+    final perPerson = formatMoney(currency, result.amountPerPerson.toString());
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -460,6 +493,15 @@ class _ResultRow extends StatelessWidget {
                 style: theme.textTheme.bodySmall,
               ),
               Text('1人あたり $perPerson', style: theme.textTheme.bodySmall),
+              // 端数の引き受け役がいるグループだけ、その人の金額も出す
+              if (result.hasExtra)
+                Text(
+                  'うち1人は '
+                  '${formatMoney(currency, result.amountWithExtra.toString())}'
+                  '（端数を負担）',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(fontWeight: FontWeight.bold),
+                ),
             ],
           ),
         ),
