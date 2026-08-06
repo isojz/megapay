@@ -86,7 +86,8 @@ class _LoginScreenState extends State<LoginScreen> {
       if (auth.currentSession != null) {
         widget.onAuthenticated?.call();
       } else if (_isSignUp) {
-        _showError('確認メールを送信しました。確認後にログインしてください。');
+        // 登録は成功しているので、エラー（赤帯）ではなく通常の通知で知らせる
+        _showMessage('確認メールを送信しました。確認後にログインしてください。');
       }
       // 成功時は AuthGate が自動的にホーム画面へ切り替える
     } on AuthException catch (err) {
@@ -105,6 +106,14 @@ class _LoginScreenState extends State<LoginScreen> {
         content: Text(message),
         backgroundColor: Theme.of(context).colorScheme.error,
       ),
+    );
+  }
+
+  /// 成功・案内など、エラーではない通知を出す。
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 
@@ -151,6 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       controller: _displayNameController,
                       textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.name],
                       decoration: const InputDecoration(
                         labelText: 'お名前（表示名）',
                         border: OutlineInputBorder(),
@@ -167,6 +177,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     keyboardType: TextInputType.emailAddress,
                     inputFormatters: emailInputFormatters,
                     textInputAction: TextInputAction.next,
+                    autofillHints: const [
+                      AutofillHints.username,
+                      AutofillHints.email,
+                    ],
                     decoration: const InputDecoration(
                       labelText: 'メールアドレス',
                       border: OutlineInputBorder(),
@@ -180,6 +194,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextFormField(
                     controller: _passwordController,
                     obscureText: !_passwordVisible,
+                    textInputAction: TextInputAction.done,
+                    autofillHints: [
+                      _isSignUp
+                          ? AutofillHints.newPassword
+                          : AutofillHints.password,
+                    ],
                     decoration: InputDecoration(
                       labelText: 'パスワード（6文字以上）',
                       border: const OutlineInputBorder(),
