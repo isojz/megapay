@@ -322,11 +322,12 @@ class _BalanceTile extends StatelessWidget {
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
         ),
-        trailing: Text(
+        // 金額は trailing（右寄せ）ではなく title に置いて左揃えにする
+        title: Text(
           formatYen(balance.amount),
           style: Theme.of(context)
               .textTheme
-              .titleMedium
+              .headlineMedium
               ?.copyWith(fontWeight: FontWeight.bold),
         ),
       ),
