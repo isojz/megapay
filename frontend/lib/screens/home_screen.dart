@@ -42,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     removeQueryParameter('split_code');
+    removeQueryParameter('ranked_split_code');
     _future = _load();
   }
 
