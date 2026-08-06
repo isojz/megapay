@@ -145,10 +145,16 @@ class _JoinSplitBillScreenState extends State<JoinSplitBillScreen> {
                       child: TextField(
                         controller: _codeController,
                         textCapitalization: TextCapitalization.characters,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: '集金者から伝えられたコード',
                           hintText: 'SP-ABCD2345',
-                          border: OutlineInputBorder(),
+                          hintStyle: TextStyle(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant
+                                .withValues(alpha: 0.45),
+                          ),
+                          border: const OutlineInputBorder(),
                         ),
                         onChanged: (_) {
                           if (_bill != null) setState(() => _bill = null);
@@ -165,7 +171,8 @@ class _JoinSplitBillScreenState extends State<JoinSplitBillScreen> {
                             ? const SizedBox(
                                 height: 20,
                                 width: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Text('確認'),
                       ),

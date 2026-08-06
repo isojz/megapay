@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
 import '../services/api_client.dart';
 import '../utils/money.dart';
+import '../utils/browser_url.dart';
 import '../widgets/payment_request_actions.dart';
 import '../widgets/transfer_tile.dart';
 import 'saved_users_screen.dart';
@@ -39,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    removeQueryParameter('split_code');
     _future = _load();
   }
 
@@ -156,6 +158,12 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           }
           final data = snapshot.data!;
+          // 画面が低い端末ではセクション間の余白を詰め、
+          // メニュー（ユーザー一覧まで）が一画面に収まりやすいようにする。
+          final gap = ((MediaQuery.sizeOf(context).height - 640) / 260)
+                      .clamp(0.0, 1.0) *
+                  12 +
+              12;
           return RefreshIndicator(
             onRefresh: _reload,
             child: Center(
@@ -163,20 +171,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 constraints: const BoxConstraints(maxWidth: 480),
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+                  padding: EdgeInsets.fromLTRB(16, gap, 16, 96),
                   children: [
                     _ProfileCard(profile: data.profile),
-                    const SizedBox(height: 12),
-                    PaymentRequestActions(
-  balances: data.balances,
-  onChanged: _reload,
-  onTransfer: () => _openTransferScreen(data.balances),
-  onSavedUsers: () => _openSavedUsers(data.balances),
-),
-                
-                    const SizedBox(height: 12),
-                    // SplitBillActions(onChanged: _reload),
-                    const SizedBox(height: 24),
+                    SizedBox(height: gap),
                     Text('残高', style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 8),
                     ...data.balances.map((b) => _BalanceTile(balance: b)),
@@ -184,7 +182,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       const Card(
                         child: ListTile(title: Text('残高がありません')),
                       ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: gap),
+                    PaymentRequestActions(
+                      balances: data.balances,
+                      onChanged: _reload,
+                      onTransfer: () => _openTransferScreen(data.balances),
+                      onSavedUsers: () => _openSavedUsers(data.balances),
+                    ),
+                    SizedBox(height: gap),
                     Text(
                       '最近の履歴',
                       style: Theme.of(context).textTheme.titleMedium,
@@ -273,8 +278,12 @@ class _ProfileCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'ユーザーID: ${profile.userId}',
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(fontFamily: 'monospace'),
+                    // monospace は日本語グリフを持たないため、ラベル部分の
+                    // フォールバック先に同梱フォントを指定する
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontFamily: 'monospace',
+                      fontFamilyFallback: const ['NotoSansJP'],
+                    ),
                   ),
                 ),
                 IconButton(

@@ -236,6 +236,7 @@ sequenceDiagram
 | GET | `/api/v1/split-bills/{code}/participants` | 参加者と支払い状況の一覧 | 404 コードなし・部外者 |
 | GET | `/api/v1/saved-users` | 保存済みユーザー一覧 | 401 |
 | POST | `/api/v1/saved-users` | ユーザーを保存 `{user_id}` | 400 自分自身 / 404 宛先なし / 422 入力不正 |
+| GET | `/api/v1/split-bills/public/{bill_code}` | 共有リンク用の割り勘限定情報（認証不要） | 404 コードなし |
 
 エラーレスポンスは `{"detail": "<日本語メッセージ>"}` 形式。
 DB 関数の `INSUFFICIENT_FUNDS` 等のエラーキーワードは `backend/app/errors.py` で HTTP ステータスへ変換する。

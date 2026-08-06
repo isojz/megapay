@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/split_bill_link_flow_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,14 +27,21 @@ class MegaPayApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final splitCode = Uri.base.queryParameters['split_code']?.trim();
     return MaterialApp(
       title: 'MegaPay',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0D47A1)),
         useMaterial3: true,
+        // 同梱の日本語フォントを既定にする（pubspec.yaml の fonts 参照）。
+        // 指定しないと CanvasKit が gstatic からの遅延取得に頼り、
+        // 取得が終わるまで日本語が豆腐（□）になる。
+        fontFamily: 'NotoSansJP',
       ),
-      home: const AuthGate(),
+      home: splitCode != null && splitCode.isNotEmpty
+          ? SplitBillLinkFlowScreen(billCode: splitCode)
+          : const AuthGate(),
     );
   }
 }

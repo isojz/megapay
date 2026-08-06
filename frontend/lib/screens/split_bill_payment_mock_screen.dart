@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../models/payment_request.dart';
 import '../services/api_client.dart';
+import '../utils/browser_url.dart';
 import '../utils/money.dart';
 import '../widgets/payment_method_selector.dart';
+import 'home_screen.dart';
 
 /// 割り勘の支払い画面。
 ///
@@ -12,10 +14,17 @@ import '../widgets/payment_method_selector.dart';
 ///   - 現金で支払った: その場で現金を渡した記録。残高・履歴は動かさず支払い済みにする
 /// PayPay やカードは決済連携が未実装のためモック（請求の状態は変わらない）。
 class SplitBillPaymentMockScreen extends StatefulWidget {
-  const SplitBillPaymentMockScreen({super.key, required this.requestCode});
+  const SplitBillPaymentMockScreen({
+    super.key,
+    required this.requestCode,
+    this.initialPaymentMethod = PaymentMethod.balance,
+    this.openedFromSharedLink = false,
+  });
 
   /// 参加時に発行された自分あての請求コード（RQ-XXXXXXXX）
   final String requestCode;
+  final PaymentMethod initialPaymentMethod;
+  final bool openedFromSharedLink;
 
   @override
   State<SplitBillPaymentMockScreen> createState() =>
@@ -27,11 +36,30 @@ class _SplitBillPaymentMockScreenState
   PaymentMethod _selectedMethod = PaymentMethod.balance;
   late Future<PaymentRequest> _future;
   bool _isPaying = false;
+  bool _isPaid = false;
 
   @override
   void initState() {
     super.initState();
-    _future = ApiClient.instance.lookupPaymentRequest(widget.requestCode);
+    _selectedMethod = widget.initialPaymentMethod;
+    _future = _loadRequest();
+  }
+
+  Future<PaymentRequest> _loadRequest() async {
+    final request =
+        await ApiClient.instance.lookupPaymentRequest(widget.requestCode);
+    if (mounted && _isPaid != request.isPaid) {
+      setState(() => _isPaid = request.isPaid);
+    }
+    return request;
+  }
+
+  Future<void> _goHome() async {
+    removeQueryParameter('split_code');
+    await Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      (route) => false,
+    );
   }
 
   void _showError(String message) {
@@ -102,7 +130,10 @@ class _SplitBillPaymentMockScreenState
           ? await api.payPaymentRequestByCash(request.requestCode)
           : await api.payPaymentRequest(request.requestCode);
       if (!mounted) return;
-      setState(() => _future = Future.value(paid));
+      setState(() {
+        _isPaid = true;
+        _future = Future.value(paid);
+      });
       await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
@@ -118,13 +149,11 @@ class _SplitBillPaymentMockScreenState
           actions: [
             FilledButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('閉じる'),
+              child: const Text('支払い済み画面へ'),
             ),
           ],
         ),
       );
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
     } on ApiException catch (err) {
       _showError(err.message);
     } finally {
@@ -136,7 +165,16 @@ class _SplitBillPaymentMockScreenState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('割り勘の支払い')),
+      appBar: AppBar(
+        title: const Text('割り勘の支払い'),
+        leading: widget.openedFromSharedLink && _isPaid
+            ? IconButton(
+                tooltip: 'ホーム画面へ',
+                onPressed: _goHome,
+                icon: const Icon(Icons.arrow_back),
+              )
+            : null,
+      ),
       body: FutureBuilder<PaymentRequest>(
         future: _future,
         builder: (context, snapshot) {
@@ -152,7 +190,8 @@ class _SplitBillPaymentMockScreenState
                   children: [
                     const Icon(Icons.error_outline, size: 48),
                     const SizedBox(height: 12),
-                    Text(snapshot.error.toString(), textAlign: TextAlign.center),
+                    Text(snapshot.error.toString(),
+                        textAlign: TextAlign.center),
                   ],
                 ),
               ),
@@ -174,16 +213,29 @@ class _SplitBillPaymentMockScreenState
                     _RequestCard(request: request),
                     const SizedBox(height: 16),
                     if (paid)
-                      Card(
-                        color: Colors.green.shade50,
-                        child: ListTile(
-                          leading: const Icon(Icons.check_circle,
-                              color: Colors.green),
-                          title: const Text('支払い済みです'),
-                          subtitle: Text(
-                            request.isPaidByCash ? '支払い方法: 現金' : '支払い方法: MegaPay残高',
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Card(
+                            color: Colors.green.shade50,
+                            child: ListTile(
+                              leading: const Icon(Icons.check_circle,
+                                  color: Colors.green),
+                              title: const Text('支払い済みです'),
+                              subtitle: Text(
+                                request.isPaidByCash
+                                    ? '支払い方法: 現金'
+                                    : '支払い方法: MegaPay残高',
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 8),
+                          FilledButton.icon(
+                            onPressed: _goHome,
+                            icon: const Icon(Icons.home_outlined),
+                            label: const Text('ホーム画面へ移動'),
+                          ),
+                        ],
                       )
                     else ...[
                       Text('支払い方法', style: theme.textTheme.titleMedium),

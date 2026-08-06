@@ -4,7 +4,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// ログイン / 口座開設（サインアップ）画面。
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.onAuthenticated});
+
+  /// ディープリンクなど、認証後に元のフローへ戻す場合に使用する。
+  final VoidCallback? onAuthenticated;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -74,6 +77,11 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
       await _saveLoginInfo(email);
+      if (auth.currentSession != null) {
+        widget.onAuthenticated?.call();
+      } else if (_isSignUp) {
+        _showError('確認メールを送信しました。確認後にログインしてください。');
+      }
       // 成功時は AuthGate が自動的にホーム画面へ切り替える
     } on AuthException catch (err) {
       _showError(err.message);
@@ -133,9 +141,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         labelText: 'お名前（表示名）',
                         border: OutlineInputBorder(),
                       ),
-                      validator: (value) => (value == null || value.trim().isEmpty)
-                          ? 'お名前を入力してください'
-                          : null,
+                      validator: (value) =>
+                          (value == null || value.trim().isEmpty)
+                              ? 'お名前を入力してください'
+                              : null,
                     ),
                     const SizedBox(height: 16),
                   ],
@@ -147,9 +156,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       labelText: 'メールアドレス',
                       border: OutlineInputBorder(),
                     ),
-                    validator: (value) => (value == null || !value.contains('@'))
-                        ? 'メールアドレスを入力してください'
-                        : null,
+                    validator: (value) =>
+                        (value == null || !value.contains('@'))
+                            ? 'メールアドレスを入力してください'
+                            : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -198,9 +208,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: _isLoading
                         ? null
                         : () => setState(() => _isSignUp = !_isSignUp),
-                    child: Text(_isSignUp
-                        ? 'アカウントをお持ちの方はログイン'
-                        : '初めての方は口座開設（サインアップ）'),
+                    child: Text(
+                        _isSignUp ? 'アカウントをお持ちの方はログイン' : '初めての方は口座開設（サインアップ）'),
                   ),
                 ],
               ),

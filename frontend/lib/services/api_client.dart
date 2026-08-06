@@ -50,7 +50,8 @@ class ApiClient {
   Future<dynamic> _post(String path, Map<String, dynamic> body) async {
     final http.Response res;
     try {
-      res = await http.post(_uri(path), headers: _headers, body: jsonEncode(body));
+      res = await http.post(_uri(path),
+          headers: _headers, body: jsonEncode(body));
     } catch (_) {
       throw ApiException(0, 'サーバーに接続できませんでした');
     }
@@ -85,9 +86,10 @@ class ApiClient {
   Future<Profile> fetchProfile() async =>
       Profile.fromJson(await _get('/api/v1/me') as Map<String, dynamic>);
 
-  Future<List<Balance>> fetchBalances() async => (await _get('/api/v1/balances') as List)
-      .map((e) => Balance.fromJson(e as Map<String, dynamic>))
-      .toList();
+  Future<List<Balance>> fetchBalances() async =>
+      (await _get('/api/v1/balances') as List)
+          .map((e) => Balance.fromJson(e as Map<String, dynamic>))
+          .toList();
 
   Future<RecipientInfo> lookupRecipient(String recipientUserId) async =>
       RecipientInfo.fromJson(
@@ -116,7 +118,8 @@ class ApiClient {
   /// 請求コードから内容を取得する（支払い前の確認用）
   Future<PaymentRequest> lookupPaymentRequest(String requestCode) async =>
       PaymentRequest.fromJson(
-        await _get('/api/v1/payment-requests/${Uri.encodeComponent(requestCode)}')
+        await _get(
+                '/api/v1/payment-requests/${Uri.encodeComponent(requestCode)}')
             as Map<String, dynamic>,
       );
 
@@ -171,8 +174,17 @@ class ApiClient {
         }) as Map<String, dynamic>,
       );
 
+  /// 割り勘リンク用の限定情報を取得する（ログイン不要）
+  Future<PublicSplitBill> lookupPublicSplitBill(String billCode) async =>
+      PublicSplitBill.fromJson(
+        await _get(
+          '/api/v1/split-bills/public/${Uri.encodeComponent(billCode)}',
+        ) as Map<String, dynamic>,
+      );
+
   /// 請求コードから割り勘の内容を取得する（参加前の確認）
-  Future<SplitBill> lookupSplitBill(String billCode) async => SplitBill.fromJson(
+  Future<SplitBill> lookupSplitBill(String billCode) async =>
+      SplitBill.fromJson(
         await _get('/api/v1/split-bills/${Uri.encodeComponent(billCode)}')
             as Map<String, dynamic>,
       );
@@ -227,8 +239,7 @@ class ApiClient {
           .map((e) => SavedUser.fromJson(e as Map<String, dynamic>))
           .toList();
 
-  Future<RecipientInfo> saveUser(String userId) async =>
-      RecipientInfo.fromJson(
+  Future<RecipientInfo> saveUser(String userId) async => RecipientInfo.fromJson(
         await _post('/api/v1/saved-users', {'user_id': userId})
             as Map<String, dynamic>,
       );
