@@ -8,7 +8,10 @@ import '../utils/money.dart';
 
 /// 請求作成画面：相手のユーザーIDを指定して請求し、支払い用の請求コードを発行する。
 class RequestCreateScreen extends StatefulWidget {
-  const RequestCreateScreen({super.key});
+  const RequestCreateScreen({super.key, this.initialPayer});
+
+  /// ユーザー一覧から開いたときに、請求先をあらかじめ埋めておく
+  final RecipientInfo? initialPayer;
 
   @override
   State<RequestCreateScreen> createState() => _RequestCreateScreenState();
@@ -25,6 +28,16 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
   RecipientInfo? _verifiedPayer;
   bool _isLookingUp = false;
   bool _isCreating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final payer = widget.initialPayer;
+    if (payer != null) {
+      _payerController.text = payer.userId;
+      _verifiedPayer = payer;
+    }
+  }
 
   @override
   void dispose() {
