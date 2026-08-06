@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_client.dart';
 import '../utils/money.dart';
+import '../widgets/saved_user_picker.dart';
 
 /// 送金画面：宛先（ユーザーID）と日本円の金額を指定して送金する。
 class TransferScreen extends StatefulWidget {
@@ -64,6 +65,17 @@ class _TransferScreenState extends State<TransferScreen> {
         backgroundColor: Theme.of(context).colorScheme.error,
       ),
     );
+  }
+
+  /// ユーザー一覧から宛先を選ぶ。保存済みユーザーは表示名も分かっているため、
+  /// 選んだ時点で確認済みとして扱う。
+  Future<void> _pickFromSavedUsers() async {
+    final picked = await SavedUserPicker.show(context);
+    if (picked == null || !mounted) return;
+    setState(() {
+      _recipientController.text = picked.userId;
+      _verifiedRecipient = picked;
+    });
   }
 
   /// 宛先IDから相手を検索して表示名を確認する。
@@ -221,8 +233,15 @@ class _TransferScreenState extends State<TransferScreen> {
                       ),
                     ],
                   ),
-                  if (_verifiedRecipient != null) ...[
-                    const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _pickFromSavedUsers,
+                      icon: const Icon(Icons.people_outline),
+                      label: const Text('ユーザー一覧から選ぶ'),
+                    ),
+                  ),
+                  if (_verifiedRecipient != null)
                     Card(
                       color: Colors.green.shade50,
                       child: ListTile(
@@ -232,7 +251,6 @@ class _TransferScreenState extends State<TransferScreen> {
                         subtitle: Text(_verifiedRecipient!.userId),
                       ),
                     ),
-                  ],
                   const SizedBox(height: 24),
                   Text('金額', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
