@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/split_bill_link_flow_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,6 +27,7 @@ class MegaPayApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final splitCode = Uri.base.queryParameters['split_code']?.trim();
     return MaterialApp(
       title: 'MegaPay',
       debugShowCheckedModeBanner: false,
@@ -37,7 +39,9 @@ class MegaPayApp extends StatelessWidget {
         // 取得が終わるまで日本語が豆腐（□）になる。
         fontFamily: 'NotoSansJP',
       ),
-      home: const AuthGate(),
+      home: splitCode != null && splitCode.isNotEmpty
+          ? SplitBillLinkFlowScreen(billCode: splitCode)
+          : const AuthGate(),
     );
   }
 }

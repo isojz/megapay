@@ -5,12 +5,23 @@ from .. import db_split_bills as db
 from ..auth import AuthUser, get_current_user
 from ..errors import to_http_exception
 from ..schemas_split_bills import (
+    PublicSplitBillResponse,
     SplitBillCreate,
     SplitBillParticipant,
     SplitBillResponse,
 )
 
 router = APIRouter(prefix="/api/v1/split-bills", tags=["split-bills"])
+
+
+@router.get("/public/{bill_code}", response_model=PublicSplitBillResponse)
+def get_public_split_bill(bill_code: str) -> PublicSplitBillResponse:
+    """割り勘リンク用プレビュー。認証不要で限定情報だけを返す。"""
+    try:
+        data = db.find_public_split_bill(bill_code.strip())
+    except APIError as err:
+        raise to_http_exception(err) from err
+    return PublicSplitBillResponse(**data)
 
 
 @router.post("", response_model=SplitBillResponse, status_code=status.HTTP_201_CREATED)

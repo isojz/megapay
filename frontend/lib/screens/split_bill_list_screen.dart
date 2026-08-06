@@ -15,6 +15,7 @@ class SplitBillListScreen extends StatefulWidget {
 
 class _SplitBillListScreenState extends State<SplitBillListScreen> {
   late Future<List<SplitBill>> _future;
+  _ListStatus _status = _ListStatus.inProgress;
 
   @override
   void initState() {
@@ -38,71 +39,143 @@ class _SplitBillListScreenState extends State<SplitBillListScreen> {
     await _reload();
   }
 
+  bool _isCompleted(SplitBill bill) => bill.isOrganizer
+      ? bill.paidCount >= bill.expectedPayerCount
+      : bill.isPaidByMe;
+
+  Widget _buildRoleList(List<SplitBill> bills, {required bool organizer}) {
+    final roleBills =
+        bills.where((bill) => bill.isOrganizer == organizer).toList();
+    final inProgressCount =
+        roleBills.where((bill) => !_isCompleted(bill)).length;
+    final completedCount = roleBills.where(_isCompleted).length;
+    final visibleBills = roleBills
+        .where(
+          (bill) => _status == _ListStatus.completed
+              ? _isCompleted(bill)
+              : !_isCompleted(bill),
+        )
+        .toList();
+
+    return RefreshIndicator(
+      onRefresh: _reload,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            children: [
+              SegmentedButton<_ListStatus>(
+                segments: [
+                  ButtonSegment(
+                    value: _ListStatus.inProgress,
+                    icon: const Icon(Icons.schedule),
+                    label: Text('進行中 $inProgressCount'),
+                  ),
+                  ButtonSegment(
+                    value: _ListStatus.completed,
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: Text('完了 $completedCount'),
+                  ),
+                ],
+                selected: {_status},
+                onSelectionChanged: (selection) {
+                  setState(() => _status = selection.first);
+                },
+              ),
+              const SizedBox(height: 16),
+              if (visibleBills.isEmpty)
+                Card(
+                  child: ListTile(
+                    leading: Icon(
+                      _status == _ListStatus.completed
+                          ? Icons.check_circle_outline
+                          : Icons.info_outline,
+                    ),
+                    title: Text(
+                      _status == _ListStatus.completed
+                          ? '完了した割り勘はありません'
+                          : '進行中の割り勘はありません',
+                    ),
+                    subtitle: Text(
+                      organizer ? '作成した割り勘がここに表示されます' : '参加した割り勘がここに表示されます',
+                    ),
+                  ),
+                ),
+              ...visibleBills.map(
+                (bill) => _SplitBillTile(
+                  bill: bill,
+                  onTap: () => _openDetail(bill),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('割り勘一覧')),
-      body: FutureBuilder<List<SplitBill>>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.error_outline, size: 48),
-                    const SizedBox(height: 12),
-                    Text(snapshot.error.toString(), textAlign: TextAlign.center),
-                    const SizedBox(height: 16),
-                    FilledButton.icon(
-                      onPressed: _reload,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('再読み込み'),
-                    ),
-                  ],
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('割り勘一覧'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(icon: Icon(Icons.groups_outlined), text: '集金者'),
+              Tab(icon: Icon(Icons.person_outline), text: '支払者'),
+            ],
+          ),
+        ),
+        body: FutureBuilder<List<SplitBill>>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error_outline, size: 48),
+                      const SizedBox(height: 12),
+                      Text(snapshot.error.toString(),
+                          textAlign: TextAlign.center),
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        onPressed: _reload,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('再読み込み'),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          }
+              );
+            }
 
-          final bills = snapshot.data ?? const <SplitBill>[];
-          return RefreshIndicator(
-            onRefresh: _reload,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    if (bills.isEmpty)
-                      const Card(
-                        child: ListTile(
-                          title: Text('まだ割り勘はありません'),
-                          subtitle: Text('請求コードを受け取ったら「割り勘に参加」から参加できます'),
-                        ),
-                      ),
-                    ...bills.map(
-                      (b) => _SplitBillTile(
-                        bill: b,
-                        onTap: () => _openDetail(b),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
+            final bills = List<SplitBill>.from(
+              snapshot.data ?? const <SplitBill>[],
+            )..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            return TabBarView(
+              children: [
+                _buildRoleList(bills, organizer: true),
+                _buildRoleList(bills, organizer: false),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 }
+
+enum _ListStatus { inProgress, completed }
 
 class _SplitBillTile extends StatelessWidget {
   const _SplitBillTile({required this.bill, required this.onTap});

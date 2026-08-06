@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../models/split_bill.dart';
 import '../services/api_client.dart';
+import '../utils/browser_url.dart';
 import '../utils/money.dart';
 import 'split_bill_payment_mock_screen.dart';
 
@@ -60,6 +61,15 @@ class _SplitBillDetailScreenState extends State<SplitBillDetailScreen> {
     );
   }
 
+  Future<void> _copyLink(SplitBill bill) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final link = buildSplitBillPaymentLink(bill.billCode);
+    await Clipboard.setData(ClipboardData(text: link));
+    messenger.showSnackBar(
+      const SnackBar(content: Text('支払いリンクをコピーしました')),
+    );
+  }
+
   Future<void> _pay(SplitBill bill) async {
     final code = bill.myRequestCode;
     if (code == null) return;
@@ -91,7 +101,8 @@ class _SplitBillDetailScreenState extends State<SplitBillDetailScreen> {
                   children: [
                     const Icon(Icons.error_outline, size: 48),
                     const SizedBox(height: 12),
-                    Text(snapshot.error.toString(), textAlign: TextAlign.center),
+                    Text(snapshot.error.toString(),
+                        textAlign: TextAlign.center),
                     const SizedBox(height: 16),
                     FilledButton.icon(
                       onPressed: _reload,
@@ -106,6 +117,8 @@ class _SplitBillDetailScreenState extends State<SplitBillDetailScreen> {
 
           final bill = snapshot.data!.bill;
           final participants = snapshot.data!.participants;
+          final emptySlotCount =
+              (bill.expectedPayerCount - participants.length).clamp(0, 100);
           return RefreshIndicator(
             onRefresh: _reload,
             child: Center(
@@ -115,7 +128,11 @@ class _SplitBillDetailScreenState extends State<SplitBillDetailScreen> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(16),
                   children: [
-                    _SummaryCard(bill: bill, onCopyCode: () => _copyCode(bill)),
+                    _SummaryCard(
+                      bill: bill,
+                      onCopyCode: () => _copyCode(bill),
+                      onCopyLink: () => _copyLink(bill),
+                    ),
                     if (bill.joined && !bill.isPaidByMe) ...[
                       const SizedBox(height: 16),
                       FilledButton.icon(
@@ -134,7 +151,8 @@ class _SplitBillDetailScreenState extends State<SplitBillDetailScreen> {
                       Card(
                         color: Colors.green.shade50,
                         child: const ListTile(
-                          leading: Icon(Icons.check_circle, color: Colors.green),
+                          leading:
+                              Icon(Icons.check_circle, color: Colors.green),
                           title: Text('あなたは支払い済みです'),
                         ),
                       ),
@@ -148,23 +166,23 @@ class _SplitBillDetailScreenState extends State<SplitBillDetailScreen> {
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                         Text(
-                          '${bill.paidCount} / ${participants.length} 人が支払い済み',
+                          '参加 ${participants.length + 1} / ${bill.participantCount} 人',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    if (participants.isEmpty)
-                      const Card(
-                        child: ListTile(
-                          title: Text('まだ誰も参加していません'),
-                          subtitle: Text('請求コードを参加者に伝えてください'),
-                        ),
-                      ),
+                    _OrganizerTile(bill: bill),
                     ...participants.map(
                       (p) => _ParticipantTile(
                         participant: p,
                         currency: bill.currency,
+                      ),
+                    ),
+                    ...List.generate(
+                      emptySlotCount,
+                      (index) => _EmptyParticipantTile(
+                        slotNumber: participants.length + index + 2,
                       ),
                     ),
                   ],
@@ -179,10 +197,15 @@ class _SplitBillDetailScreenState extends State<SplitBillDetailScreen> {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.bill, required this.onCopyCode});
+  const _SummaryCard({
+    required this.bill,
+    required this.onCopyCode,
+    required this.onCopyLink,
+  });
 
   final SplitBill bill;
   final VoidCallback onCopyCode;
+  final VoidCallback onCopyLink;
 
   @override
   Widget build(BuildContext context) {
@@ -246,13 +269,65 @@ class _SummaryCard extends StatelessWidget {
               ],
             ),
             Text(
-              bill.isFull
-                  ? '参加人数の上限に達しています'
-                  : 'このコードを参加者に伝えると、グループに参加して支払えます',
+              bill.isFull ? '参加人数の上限に達しています' : 'このコードを参加者に伝えると、グループに参加して支払えます',
               style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.tonalIcon(
+                onPressed: onCopyLink,
+                icon: const Icon(Icons.link, size: 18),
+                label: const Text('支払いリンクをコピー'),
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _OrganizerTile extends StatelessWidget {
+  const _OrganizerTile({required this.bill});
+
+  final SplitBill bill;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: theme.colorScheme.primaryContainer,
+          child: Icon(Icons.person, color: theme.colorScheme.primary),
+        ),
+        title: Text('${bill.organizerName} さん（集金者）'),
+        subtitle: const Text('参加済み・支払い対象外'),
+        trailing: const Icon(Icons.check_circle, color: Colors.green),
+      ),
+    );
+  }
+}
+
+class _EmptyParticipantTile extends StatelessWidget {
+  const _EmptyParticipantTile({required this.slotNumber});
+
+  final int slotNumber;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      color: theme.colorScheme.surfaceContainerLowest,
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: theme.colorScheme.surfaceContainerHighest,
+          child: Icon(Icons.person_outline, color: theme.colorScheme.outline),
+        ),
+        title: Text('参加者 $slotNumber：未参加'),
+        subtitle: const Text('参加者を待っています'),
+        trailing: Icon(Icons.hourglass_empty, color: theme.colorScheme.outline),
       ),
     );
   }

@@ -7,7 +7,17 @@
 from decimal import Decimal
 from typing import Any
 
+from supabase import create_client
+
+from .config import get_settings
 from .db import _client
+
+
+def find_public_split_bill(code: str) -> dict[str, Any]:
+    settings = get_settings()
+    client = create_client(settings.supabase_url, settings.supabase_anon_key)
+    res = client.rpc("find_public_split_bill", {"p_code": code}).execute()
+    return res.data
 
 
 def create_split_bill(
