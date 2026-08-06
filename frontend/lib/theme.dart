@@ -19,8 +19,10 @@ const double megaPayControlRadius = 14;
 /// タップ領域の最小の高さ。ボタンはこれ以上にして押しやすさを担保する。
 const double megaPayMinTapTarget = 52;
 
-/// 画面本文の最大幅。Web で横に間延びしないよう全画面で共有する。
-/// ホームだけは要素が多いので個別に広めの値を使う。
+/// 画面本文の最大幅。Web で横に間延びしないための基準値。
+///
+/// 既存の画面は同じ 480 を各自で直書きしているため、ここへの置き換えは
+/// 差分が広範囲に及ぶ。新しく画面を作るときはこの値を参照すること。
 const double megaPayContentMaxWidth = 480;
 
 /// 意味を持つ色（成功・注意・情報や、増減する金額の色）をまとめたテーマ拡張。
@@ -147,6 +149,11 @@ class MegaPaySemantics extends ThemeExtension<MegaPaySemantics> {
 }
 
 /// アプリ全体のライトテーマ。main.dart から参照する。
+///
+/// ダークテーマは _buildTheme が既に組み立てられる状態にしてあるが、まだ
+/// 有効にしていない。各画面に Colors.green などの固定色が残っており、
+/// 今の状態でダークにするとその部分だけ浮いてしまうため。固定色を
+/// MegaPaySemantics へ寄せ切ってから darkTheme を渡すこと。
 ThemeData buildMegaPayTheme() => _buildTheme(Brightness.light);
 
 ThemeData _buildTheme(Brightness brightness) {
