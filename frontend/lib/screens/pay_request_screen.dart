@@ -99,9 +99,12 @@ class _PayRequestScreenState extends State<PayRequestScreen> {
             const SizedBox(height: 8),
             _ConfirmRow(label: '支払い方法', value: _paymentMethod.label),
             const SizedBox(height: 8),
-            const Text(
-              '支払うと送金が実行されます。取り消せません。',
-              style: TextStyle(fontSize: 12),
+            Text(
+              _paymentMethod == PaymentMethod.balance
+                  ? '支払うと残高から送金が実行されます。取り消せません。'
+                  : '${_paymentMethod.label}で引き落とされます。'
+                      'MegaPay残高は減りません。取り消せません。',
+              style: const TextStyle(fontSize: 12),
             ),
           ],
         ),
@@ -121,8 +124,12 @@ class _PayRequestScreenState extends State<PayRequestScreen> {
 
     setState(() => _isPaying = true);
     try {
-      final paid =
-          await ApiClient.instance.payPaymentRequest(request.requestCode);
+      final api = ApiClient.instance;
+      // 残高払いだけが自分の残高を減らす。PayPay・カードは外部で引き落とされる
+      // 想定なので、相手の残高と履歴にだけ反映する。
+      final paid = _paymentMethod == PaymentMethod.balance
+          ? await api.payPaymentRequest(request.requestCode)
+          : await api.payPaymentRequestByExternal(request.requestCode);
       if (!mounted) return;
       setState(() => _request = paid);
       await showDialog<void>(

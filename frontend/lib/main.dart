@@ -48,6 +48,14 @@ class MegaPayApp extends StatelessWidget {
           foregroundColor: megaPayOnBrandColor,
           elevation: 0,
         ),
+        // タブは赤地に白だと選択中と未選択の区別が付きにくい。
+        // カードと同じ明るい面に載せ、文字色で選択状態を示す。
+        tabBarTheme: TabBarThemeData(
+          labelColor: megaPayBrandColor,
+          unselectedLabelColor: colorScheme.onSurfaceVariant,
+          indicatorColor: megaPayBrandColor,
+          dividerColor: Colors.transparent,
+        ),
         // 入力例（hintText）は既定色だと入力済みの文字と紛らわしいため薄くする。
         // 画面ごとに指定すると濃さがばらつくので、ここで一元管理する。
         inputDecorationTheme: InputDecorationTheme(

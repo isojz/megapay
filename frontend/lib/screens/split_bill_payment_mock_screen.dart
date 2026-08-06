@@ -7,13 +7,15 @@ import '../utils/money.dart';
 import '../widgets/payment_method_selector.dart';
 import 'home_screen.dart';
 
-/// 割り勘の支払い画面。
+/// 割り勘の支払い画面。支払い方法によって残高の動きが変わる。
 ///
-///   - 現金で支払った: その場で現金を渡した記録。残高・履歴は動かさず支払い済みにする
-///   - それ以外の支払い方法: 送金が実行され、相手の残高と履歴に反映される
+///   - 残高から支払う : 自分の残高が減り、集金者の残高が増える
+///   - 現金で支払った : どちらの残高も動かさず、支払い済みの記録だけ残す
+///   - PayPay・カード : 引き落としは外部の決済事業者側で行われる想定のため
+///                      自分の残高は減らず、集金者の残高だけが増える
 ///
-/// PayPay やカードは外部の決済連携が未実装のため、実際の引き落としは発生せず
-/// MegaPay 残高から送金される。表示上の支払い方法だけが変わる。
+/// なお外部決済の連携自体は未実装のため、実際には引き落としが起きないまま
+/// 集金者の残高が増える。デモ用の挙動である。
 class SplitBillPaymentMockScreen extends StatefulWidget {
   const SplitBillPaymentMockScreen({
     super.key,
@@ -94,9 +96,13 @@ class _SplitBillPaymentMockScreenState
             _DetailRow(label: '支払い方法', value: method.label),
             const SizedBox(height: 12),
             Text(
-              isCash
-                  ? '現金で渡した記録だけを残します。アプリ内の残高は動きません。'
-                  : '支払うと送金が実行されます。取り消せません。',
+              switch (method) {
+                PaymentMethod.cash =>
+                  '現金で渡した記録だけを残します。アプリ内の残高は動きません。',
+                PaymentMethod.balance => '支払うと残高から送金が実行されます。取り消せません。',
+                _ => '${method.label}で引き落とされます。'
+                    'MegaPay残高は減りません。取り消せません。',
+              },
               style: const TextStyle(fontSize: 12),
             ),
           ],
@@ -118,9 +124,17 @@ class _SplitBillPaymentMockScreenState
     setState(() => _isPaying = true);
     try {
       final api = ApiClient.instance;
-      final paid = isCash
-          ? await api.payPaymentRequestByCash(request.requestCode)
-          : await api.payPaymentRequest(request.requestCode);
+      final paid = switch (method) {
+        PaymentMethod.cash => await api.payPaymentRequestByCash(
+            request.requestCode,
+          ),
+        PaymentMethod.balance => await api.payPaymentRequest(
+            request.requestCode,
+          ),
+        // PayPay・カードは外部で引き落とされる想定。
+        // 自分の残高は減らさず、集金者の残高と履歴にだけ反映する。
+        _ => await api.payPaymentRequestByExternal(request.requestCode),
+      };
       if (!mounted) return;
       setState(() {
         _isPaid = true;
@@ -263,9 +277,13 @@ class _SplitBillPaymentMockScreenState
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        _selectedMethod == PaymentMethod.cash
-                            ? '現金払いは残高を動かさず、支払い済みの記録だけを残します。'
-                            : 'MegaPay残高から集金者へ送金されます。',
+                        switch (_selectedMethod) {
+                          PaymentMethod.cash =>
+                            '現金払いは残高を動かさず、支払い済みの記録だけを残します。',
+                          PaymentMethod.balance => 'MegaPay残高から集金者へ送金されます。',
+                          _ => '${_selectedMethod.label}で引き落とされ、集金者へ入金されます。'
+                              'MegaPay残高は減りません。',
+                        },
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodySmall
                             ?.copyWith(color: theme.colorScheme.outline),

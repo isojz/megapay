@@ -132,6 +132,17 @@ class ApiClient {
         ) as Map<String, dynamic>,
       );
 
+  /// PayPay・カードなどの外部決済で支払う。
+  /// 引き落としは外部の決済事業者側で行われる想定のため、自分の残高は減らない。
+  /// 集金者の残高と、双方の送金履歴には反映される。
+  Future<PaymentRequest> payPaymentRequestByExternal(String requestCode) async =>
+      PaymentRequest.fromJson(
+        await _post(
+          '/api/v1/payment-requests/${Uri.encodeComponent(requestCode)}/pay-external',
+          const {},
+        ) as Map<String, dynamic>,
+      );
+
   /// 現金で支払ったことを記録する（残高・送金履歴は変更されない）
   Future<PaymentRequest> payPaymentRequestByCash(String requestCode) async =>
       PaymentRequest.fromJson(

@@ -123,11 +123,19 @@ class _SplitBillListScreenState extends State<SplitBillListScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('割り勘一覧'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(icon: Icon(Icons.groups_outlined), text: '集金者'),
-              Tab(icon: Icon(Icons.person_outline), text: '支払者'),
-            ],
+          // タブは赤いヘッダーの上ではなく、一覧のカードと同じ明るい面に載せる。
+          // 赤地に白文字だと選択中と未選択が見分けにくいため。
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(72),
+            child: ColoredBox(
+              color: Theme.of(context).colorScheme.surface,
+              child: const TabBar(
+                tabs: [
+                  Tab(icon: Icon(Icons.groups_outlined), text: '集金者'),
+                  Tab(icon: Icon(Icons.person_outline), text: '支払者'),
+                ],
+              ),
+            ),
           ),
         ),
         body: FutureBuilder<List<SplitBill>>(
