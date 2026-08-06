@@ -168,10 +168,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     _ProfileCard(profile: data.profile),
                     const SizedBox(height: 12),
                     PaymentRequestActions(
-                      onChanged: _reload,
-                      onTransfer: () => _openTransferScreen(data.balances),
-                      onSavedUsers: () => _openSavedUsers(data.balances),
-                    ),
+  balances: data.balances,
+  onChanged: _reload,
+  onTransfer: () => _openTransferScreen(data.balances),
+  onSavedUsers: () => _openSavedUsers(data.balances),
+),
+                
+                    const SizedBox(height: 12),
+                    // SplitBillActions(onChanged: _reload),
                     const SizedBox(height: 24),
                     Text('残高', style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 8),
