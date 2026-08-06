@@ -5,6 +5,8 @@ import '../models/split_bill.dart';
 import '../services/api_client.dart';
 import '../utils/money.dart';
 import '../utils/browser_url.dart';
+import '../utils/weighted_split.dart';
+import '../widgets/weighted_split_editor.dart';
 import 'split_bill_detail_screen.dart';
 
 /// 割り勘は日本円のみ対応する。
@@ -12,6 +14,9 @@ const _currency = 'JPY';
 
 /// 件名を省略した場合に使う既定のイベント名。
 const _defaultTitle = '割り勘';
+
+/// 分け方。既定は等分で、傾斜はグループごとに重みを設定する。
+enum _SplitMode { even, weighted }
 
 /// 割り勘作成画面：合計金額と人数を入力して割り勘を登録し、参加用の請求コードを発行する。
 /// 発行したコードを参加者が入力すると、割り勘後の金額が自動で請求される。
@@ -33,8 +38,32 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
 
   bool _isCreating = false;
 
+  /// 分け方。既定は等分で、必要なときだけ傾斜に切り替える。
+  _SplitMode _mode = _SplitMode.even;
+
+  /// 傾斜のグループ設定（傾斜を選んだときだけ使う）
+  List<SplitGroup> _groups = const [
+    SplitGroup(name: '多めに払う人', count: 1, weight: 1.5),
+    SplitGroup(name: '少なめに払う人', count: 1, weight: 1.0),
+  ];
+
+  /// 合計金額の入力欄の現在値（傾斜の割り振り表示に使う）
+  int? get _enteredAmount => int.tryParse(_amountController.text.trim());
+
+  @override
+  void initState() {
+    super.initState();
+    // 金額を打つたびに傾斜の割り振りを計算し直す
+    _amountController.addListener(_onAmountChanged);
+  }
+
+  void _onAmountChanged() {
+    if (_mode == _SplitMode.weighted && mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    _amountController.removeListener(_onAmountChanged);
     _titleController.dispose();
     _amountController.dispose();
     _countController.dispose();
@@ -53,6 +82,10 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
 
   Future<void> _create() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (_mode == _SplitMode.weighted) {
+      await _createWeighted();
+      return;
+    }
 
     final title = _titleController.text.trim();
     final total = _amountController.text.trim();
@@ -83,6 +116,85 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
     } finally {
       if (mounted) setState(() => _isCreating = false);
     }
+  }
+
+  /// 傾斜つきの割り勘を作成する。
+  ///
+  /// 割り振りの計算はこの画面（フロント）で完結している。
+  /// 作成後のリンク発行・保存は別途実装されるため、ここでは確定した割り振りを
+  /// 確認できる状態にして、結果を呼び出し元へ返すところまでを行う。
+  Future<void> _createWeighted() async {
+    final amount = _enteredAmount;
+    final error = validateSplitGroups(_groups);
+    if (amount == null || amount <= 0) {
+      _showError('合計金額を入力してください');
+      return;
+    }
+    if (error != null) {
+      _showError(error);
+      return;
+    }
+
+    final title = _titleController.text.trim();
+    final result = calculateWeightedSplit(totalAmount: amount, groups: _groups);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        scrollable: true,
+        title: const Text('割り振りの確認'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title.isEmpty ? _defaultTitle : title),
+            const SizedBox(height: 12),
+            for (final group in result.groups)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${group.group.name}（${group.group.count}人）',
+                      ),
+                    ),
+                    Text(
+                      formatMoney(_currency, group.totalAmount.toString()),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            const Divider(),
+            Row(
+              children: [
+                Expanded(child: Text('合計 ${result.totalCount} 人')),
+                Text(
+                  formatMoney(_currency, result.totalAmount.toString()),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('戻る'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('この割り振りで作成'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    // TODO(team): 傾斜つき割り勘の作成・リンク発行はここに実装する。
+    //   result（グループごとの金額と合計）と title をそのまま渡せばよい。
+    Navigator.of(context).pop(result);
   }
 
   @override
@@ -129,29 +241,61 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                     },
                   ),
                   const SizedBox(height: 24),
-                  Text('参加者', style: Theme.of(context).textTheme.titleMedium),
+                  Text('分け方', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _countController,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: const InputDecoration(
-                      labelText: '人数',
-                      suffixText: '人',
-                      helperText: '自分を含めた人数。端数は切り上げます',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) {
-                      final count = int.tryParse(value?.trim() ?? '');
-                      if (count == null || count < 2) {
-                        return '2以上の人数を入力してください';
-                      }
-                      if (count > _maxParticipants) {
-                        return '人数は$_maxParticipants人までです';
-                      }
-                      return null;
+                  SegmentedButton<_SplitMode>(
+                    segments: const [
+                      ButtonSegment(
+                        value: _SplitMode.even,
+                        icon: Icon(Icons.balance),
+                        label: Text('等分'),
+                      ),
+                      ButtonSegment(
+                        value: _SplitMode.weighted,
+                        icon: Icon(Icons.tune),
+                        label: Text('傾斜をつける'),
+                      ),
+                    ],
+                    selected: {_mode},
+                    onSelectionChanged: (selection) {
+                      setState(() => _mode = selection.first);
                     },
                   ),
+                  const SizedBox(height: 16),
+                  if (_mode == _SplitMode.even) ...[
+                    Text('参加者',
+                        style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _countController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: const InputDecoration(
+                        labelText: '人数',
+                        suffixText: '人',
+                        helperText: '自分を含めた人数。端数は切り上げます',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        // 傾斜のときはこの欄を使わないので検証しない
+                        if (_mode != _SplitMode.even) return null;
+                        final count = int.tryParse(value?.trim() ?? '');
+                        if (count == null || count < 2) {
+                          return '2以上の人数を入力してください';
+                        }
+                        if (count > _maxParticipants) {
+                          return '人数は$_maxParticipants人までです';
+                        }
+                        return null;
+                      },
+                    ),
+                  ] else
+                    WeightedSplitEditor(
+                      currency: _currency,
+                      totalAmount: _enteredAmount,
+                      groups: _groups,
+                      onChanged: (groups) => setState(() => _groups = groups),
+                    ),
                   const SizedBox(height: 24),
                   FilledButton.icon(
                     onPressed: _isCreating ? null : _create,
