@@ -190,8 +190,8 @@ class WeightedSplitEditor extends StatelessWidget {
         const SizedBox(height: 16),
         Text('割り振りの単位', style: theme.textTheme.titleMedium),
         Text(
-          'この単位できりよく割り振り、端数は重みがいちばん大きいグループの人たちで'
-          '1円単位に分けて負担します',
+          'この単位に四捨五入して割り振り、生じたずれは重みがいちばん大きいグループの'
+          '人たちで1円単位に調整します',
           style: theme.textTheme.bodySmall
               ?.copyWith(color: theme.colorScheme.outline),
         ),
@@ -529,8 +529,9 @@ class _ResultCard extends StatelessWidget {
             ] else if (result.hasExtra) ...[
               const SizedBox(height: 8),
               Text(
-                '端数は「${result.extraBearer!.group.name}」の'
-                '${result.extraBearer!.group.count}人で1円単位に分けて負担します'
+                '四捨五入で生じたずれは「${result.extraBearer!.group.name}」の'
+                '${result.extraBearer!.group.count}人で1円単位に'
+                '${result.extraBearer!.isDiscount ? '差し引いて' : '足して'}調整します'
                 '（合計はぴったり一致します）',
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.outline),

@@ -44,19 +44,20 @@ class SplitGroupResult {
   /// このグループの 1 人あたりの金額（割り振り単位で丸めた額）
   final int amountPerPerson;
 
-  /// 端数をこのグループで負担する場合の 1 人あたりの上乗せ額。
-  /// 端数は重みがいちばん大きいグループの人たちで 1 円単位に分けるため、
-  /// このグループが端数の負担先でなければ 0 になる。
+  /// 端数をこのグループで調整する場合の 1 人あたりの増減額。
+  /// 四捨五入で足りなければプラス、集めすぎならマイナスになる。
+  /// 調整は重みがいちばん大きいグループの人たちで 1 円単位に分けるため、
+  /// このグループが調整先でなければ 0 になる。
   final int extraPerPerson;
 
-  /// 上乗せをさらに 1 円だけ多く負担する人数（端数が人数で割り切れないとき）
+  /// 上の調整をさらに 1 円だけ多く負担する人数（端数が人数で割り切れないとき）
   final int extraExtraCount;
 
   /// このグループに含まれる集金者の人数（0 か 1）
   final int organizerCount;
 
-  /// 端数の負担が発生しているか
-  bool get hasExtra => extraPerPerson > 0 || extraExtraCount > 0;
+  /// 端数の調整が発生しているか（増額・減額どちらも含む）
+  bool get hasExtra => extraPerPerson != 0 || extraExtraCount != 0;
 
   /// このグループの基本の 1 人あたり金額（端数の上乗せ込み）
   int get amountWithExtra => amountPerPerson + extraPerPerson;
@@ -66,6 +67,9 @@ class SplitGroupResult {
 
   /// グループ内で金額が 2 種類になるか（1 円差が出るか）
   bool get hasOddYen => extraExtraCount > 0 && extraExtraCount < group.count;
+
+  /// 端数の調整で減額になっているか（四捨五入で集めすぎたとき）
+  bool get isDiscount => extraPerPerson < 0;
 
   /// このグループの合計金額
   int get totalAmount =>
@@ -167,9 +171,10 @@ String? validateSplitGroups(
 
 /// 合計金額をグループの重みに応じて配分する。
 ///
-/// 1 人あたりの金額は「合計 × 重み ÷ 重み付き人数の合計」を [unit] 単位に切り捨てた額。
-/// 切り捨てで余った分（端数）は、重みがいちばん大きいグループの人たちで 1 円単位に分けて負担する。
-/// これにより、ほとんどの人はきりのよい金額になり、配分後の合計は必ず [totalAmount] と一致する。
+/// 1 人あたりの金額は「合計 × 重み ÷ 重み付き人数の合計」を [unit] 単位に四捨五入した額。
+/// 500 円単位なら 249 円は切り捨てて 0 円に、250 円は切り上げて 500 円になる。
+/// 四捨五入で生じたずれ（足りない分・集めすぎた分）は、重みがいちばん大きいグループの
+/// 人たちで 1 円単位に分けて調整するため、配分後の合計は必ず [totalAmount] と一致する。
 ///
 /// [organizerGroupIndex] に集金者が属するグループを指定すると、集金者もグループの人数に
 /// 含めて計算する（＝集金者の分だけ他の人の負担が軽くなる）。集金者は自分に請求しないため、
@@ -210,29 +215,32 @@ SplitResult calculateWeightedSplit({
     (sum, group) => sum + group.count * group.weight,
   );
 
-  // 1. 各グループの 1 人あたりの金額を unit 単位に切り捨てる
+  // 1. 各グループの 1 人あたりの金額を unit 単位に四捨五入する
+  //    （500 円単位なら 249 円は 0 円、250 円は 500 円になる）
   final baseAmounts = groups.map((group) {
     final ideal = totalAmount * group.weight / weightedCount;
-    return (ideal / unit).floor() * unit;
+    return (ideal / unit).round() * unit;
   }).toList();
 
-  // 2. 切り捨てで足りない分（端数）を求める。切り捨てなので必ず 0 以上になる。
+  // 2. 四捨五入で生じたずれを求める。
+  //    足りなければプラス、集めすぎならマイナスになる。
   var assigned = 0;
   for (var i = 0; i < groups.length; i++) {
     assigned += baseAmounts[i] * groups[i].count;
   }
   final remainder = totalAmount - assigned;
 
-  // 3. 端数は重みがいちばん大きいグループの人たちで 1 円単位に分ける
+  // 3. ずれは重みがいちばん大きいグループの人たちで 1 円単位に分けて調整する
   //    （重みが同じなら先に並んでいるグループ）
   var topIndex = 0;
   for (var i = 1; i < groups.length; i++) {
     if (groups[i].weight > groups[topIndex].weight) topIndex = i;
   }
   final topCount = groups[topIndex].count;
-  final extraPerPerson = remainder ~/ topCount;
+  // マイナスでも正しく分けるため floor で求める（Dart の ~/ は 0 方向に丸めるため使わない）
+  final extraPerPerson = (remainder / topCount).floor();
   // 均等に割れなかった 1 円は、そのグループの一部の人が引き受ける
-  final extraExtraCount = remainder % topCount;
+  final extraExtraCount = remainder - extraPerPerson * topCount;
 
   return SplitResult(
     groups: [

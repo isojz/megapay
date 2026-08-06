@@ -35,7 +35,7 @@ void expectExtraSpreadEvenly(SplitResult result) {
 
 void main() {
   group('端数の分け方（上のグループ内で1円単位）', () {
-    test('端数は上のグループの人たちで均等に分けられる', () {
+    test('1人あたりの金額は単位に四捨五入される', () {
       final result = calculateWeightedSplit(
         totalAmount: 30000,
         unit: 500,
@@ -44,13 +44,24 @@ void main() {
           SplitGroup(name: '少なめ', count: 3, weight: 1),
         ],
       );
-      // 重み付き人数 = 7 → 多め 8571→8500、少なめ 4285→4000
-      // 割当 29,000、端数 1,000 を多め2人で 500 円ずつ負担 → 9,000 円
+      // 重み付き人数 = 7 → 多め 8571.4 → 8500、少なめ 4285.7 → 4500（切り上げ）
       expect(result.groups[0].amountPerPerson, 8500);
-      expect(result.groups[0].extraPerPerson, 500);
-      expect(result.groups[0].extraExtraCount, 0);
-      expect(result.groups[0].amountWithExtra, 9000);
-      expect(result.groups[1].amountWithExtra, 4000);
+      expect(result.groups[1].amountPerPerson, 4500);
+      expectTotalMatches(result, 30000);
+    });
+
+    test('四捨五入で集めすぎたときは上のグループが減額で調整する', () {
+      final result = calculateWeightedSplit(
+        totalAmount: 30000,
+        unit: 500,
+        groups: const [
+          SplitGroup(name: '多め', count: 2, weight: 2),
+          SplitGroup(name: '少なめ', count: 3, weight: 1),
+        ],
+      );
+      // 8500×2 + 4500×3 = 30,500 で 500 円集めすぎ → 多めが 500 円ぶん減る
+      expect(result.groups[0].isDiscount, isTrue);
+      expect(result.extraBearer?.group.name, '多め');
       expectTotalMatches(result, 30000);
     });
 
@@ -129,10 +140,10 @@ void main() {
           SplitGroup(name: '少なめ', count: 3, weight: 1),
         ],
       );
-      // 多め 9,000 円 × 2人、少なめ 4,000 円 × 3人
-      // 集金者は多めの1人 → 自己負担 9,000 円、集金は 21,000 円
-      expect(result.organizerAmount, 9000);
-      expect(result.collectAmount, 21000);
+      // 四捨五入で 多め 8,500 円、少なめ 4,500 円 → 500 円集めすぎのため
+      // 多め2人が 250 円ずつ減額され 8,250 円になる
+      expect(result.organizerAmount, 8250);
+      expect(result.collectAmount, 30000 - 8250);
       expect(result.organizerAmount + result.collectAmount, 30000);
     });
 
@@ -148,8 +159,9 @@ void main() {
       );
       expect(result.groups[0].organizerCount, 0);
       expect(result.groups[1].organizerCount, 1);
-      expect(result.organizerAmount, 4000);
-      expect(result.collectAmount, 26000);
+      // 集金者は少なめグループなので、その1人あたり金額が自己負担になる
+      expect(result.organizerAmount, result.groups[1].amountWithExtra);
+      expect(result.organizerAmount + result.collectAmount, 30000);
       expect(result.payerCount, 4);
       expectTotalMatches(result, 30000);
     });
