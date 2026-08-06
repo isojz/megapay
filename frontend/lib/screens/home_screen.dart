@@ -273,8 +273,12 @@ class _ProfileCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'ユーザーID: ${profile.userId}',
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(fontFamily: 'monospace'),
+                    // monospace は日本語グリフを持たないため、ラベル部分の
+                    // フォールバック先に同梱フォントを指定する
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontFamily: 'monospace',
+                      fontFamilyFallback: const ['NotoSansJP'],
+                    ),
                   ),
                 ),
                 IconButton(

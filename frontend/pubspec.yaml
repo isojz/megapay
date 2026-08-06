@@ -22,3 +22,16 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # CanvasKit はブラウザのシステムフォントを使わず、未収録のグリフに出会うたび
+  # fonts.gstatic.com から Noto を実行時ダウンロードする。取得が終わるまで
+  # 日本語は豆腐（□）で描画され、CDN が遮断された環境では直らない。
+  # そのためアプリ本体に日本語フォントを同梱する。
+  # 収録範囲は JIS X 0208 + ASCII + 記号（生成手順は docs/fonts.md 参照）。
+  fonts:
+    - family: NotoSansJP
+      fonts:
+        - asset: assets/fonts/NotoSansJP-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/NotoSansJP-Bold.ttf
+          weight: 700
