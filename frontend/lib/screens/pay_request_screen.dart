@@ -266,10 +266,16 @@ class _PayRequestScreenState extends State<PayRequestScreen> {
                         child: TextField(
                           controller: _codeController,
                           textCapitalization: TextCapitalization.characters,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: '相手から伝えられたコード',
                             hintText: 'RQ-ABCD2345',
-                            border: OutlineInputBorder(),
+                            hintStyle: TextStyle(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant
+                                  .withValues(alpha: 0.45),
+                            ),
+                            border: const OutlineInputBorder(),
                           ),
                           onChanged: (_) {
                             if (_request != null) {
