@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../models/models.dart';
 import '../services/mock_funding.dart';
 import '../utils/money.dart';
+import '../widgets/app_bar_title.dart';
 
 class WithdrawScreen extends StatefulWidget {
   const WithdrawScreen({
@@ -101,7 +102,10 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('出金'),
+        title: const AppBarTitle(
+          icon: Icons.account_balance_wallet_outlined,
+          title: '出金',
+        ),
       ),
       body: Center(
         child: ConstrainedBox(

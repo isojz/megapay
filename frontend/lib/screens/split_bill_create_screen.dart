@@ -7,6 +7,7 @@ import '../utils/money.dart';
 import '../utils/browser_url.dart';
 import '../utils/weighted_split.dart';
 import '../widgets/weighted_split_editor.dart';
+import '../widgets/app_bar_title.dart';
 import 'split_bill_detail_screen.dart';
 import '../utils/input_formatters.dart';
 
@@ -296,7 +297,9 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('割り勘')),
+      appBar: AppBar(
+        title: const AppBarTitle(icon: Icons.call_split, title: '割り勘'),
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),

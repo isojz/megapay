@@ -5,6 +5,7 @@ import '../services/api_client.dart';
 import '../utils/browser_url.dart';
 import '../utils/money.dart';
 import '../widgets/payment_method_selector.dart';
+import '../widgets/app_bar_title.dart';
 import 'home_screen.dart';
 
 /// 割り勘の支払い画面。支払い方法によって残高の動きが変わる。
@@ -172,7 +173,10 @@ class _SplitBillPaymentMockScreenState
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('割り勘の支払い'),
+        title: const AppBarTitle(
+          icon: Icons.payments_outlined,
+          title: '割り勘の支払い',
+        ),
         leading: widget.openedFromSharedLink && _isPaid
             ? IconButton(
                 tooltip: 'ホーム画面へ',

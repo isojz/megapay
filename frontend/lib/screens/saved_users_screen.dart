@@ -5,6 +5,7 @@ import '../services/api_client.dart';
 import 'request_create_screen.dart';
 import 'transfer_screen.dart';
 import '../utils/input_formatters.dart';
+import '../widgets/app_bar_title.dart';
 
 class SavedUsersScreen extends StatefulWidget {
   const SavedUsersScreen({super.key, required this.balances});
@@ -139,7 +140,12 @@ class _SavedUsersScreenState extends State<SavedUsersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('ユーザー一覧')),
+      appBar: AppBar(
+        title: const AppBarTitle(
+          icon: Icons.people_outline,
+          title: 'ユーザー一覧',
+        ),
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),

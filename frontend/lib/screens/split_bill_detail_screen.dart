@@ -5,6 +5,7 @@ import '../models/split_bill.dart';
 import '../services/api_client.dart';
 import '../utils/browser_url.dart';
 import '../utils/money.dart';
+import '../widgets/app_bar_title.dart';
 import 'split_bill_payment_mock_screen.dart';
 
 class _DetailData {
@@ -140,7 +141,9 @@ class _SplitBillDetailScreenState extends State<SplitBillDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('割り勘グループ')),
+      appBar: AppBar(
+        title: const AppBarTitle(icon: Icons.groups, title: '割り勘グループ'),
+      ),
       body: FutureBuilder<_DetailData>(
         future: _future,
         builder: (context, snapshot) {
