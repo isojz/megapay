@@ -211,7 +211,8 @@ class ApiClient {
   /// PayPay・カードなどの外部決済で支払う。
   /// 引き落としは外部の決済事業者側で行われる想定のため、自分の残高は減らない。
   /// 集金者の残高と、双方の送金履歴には反映される。
-  Future<PaymentRequest> payPaymentRequestByExternal(String requestCode) async =>
+  Future<PaymentRequest> payPaymentRequestByExternal(
+          String requestCode) async =>
       PaymentRequest.fromJson(
         await _post(
           '/api/v1/payment-requests/${Uri.encodeComponent(requestCode)}/pay-external',

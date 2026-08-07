@@ -58,7 +58,8 @@ class PaymentRequest {
 
   /// 自分から見た相手（請求した側なら支払う人、請求された側なら請求元）
   String get counterpartName => isRequestedByMe ? payerName : requesterName;
-  String get counterpartUserId => isRequestedByMe ? payerUserId : requesterUserId;
+  String get counterpartUserId =>
+      isRequestedByMe ? payerUserId : requesterUserId;
 
   factory PaymentRequest.fromJson(Map<String, dynamic> json) => PaymentRequest(
         requestCode: json['request_code'] as String,

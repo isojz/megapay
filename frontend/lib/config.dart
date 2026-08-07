@@ -18,12 +18,14 @@ class AppConfig {
   );
   static const supabaseAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
-    defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqaXd4aXl6dXVqeWFpdGhldXdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4MTM4NjUsImV4cCI6MjEwMTM4OTg2NX0.LqDs6sKOLEsKNTbSGpcbre8NhKicK1_Xy3MRnGfmomM',
+    defaultValue:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqaXd4aXl6dXVqeWFpdGhldXdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4MTM4NjUsImV4cCI6MjEwMTM4OTg2NX0.LqDs6sKOLEsKNTbSGpcbre8NhKicK1_Xy3MRnGfmomM',
   );
   static const apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'http://localhost:8000',
   );
 
-  static bool get isConfigured => supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
+  static bool get isConfigured =>
+      supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
 }
