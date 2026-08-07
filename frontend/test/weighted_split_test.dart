@@ -34,6 +34,105 @@ void expectExtraSpreadEvenly(SplitResult result) {
 }
 
 void main() {
+  group('1人あたり金額の連動調整', () {
+    test('上のグループを増やすと下のグループが自動で減る', () {
+      const groups = [
+        SplitGroup(name: '上', count: 2, weight: 1),
+        SplitGroup(name: '下', count: 3, weight: 1),
+      ];
+
+      final adjusted = adjustSplitGroupAmount(
+        totalAmount: 10000,
+        groups: groups,
+        changedIndex: 0,
+        amountPerPerson: 3500,
+      );
+      final result = calculateWeightedSplit(
+        totalAmount: 10000,
+        groups: adjusted,
+        unit: 1,
+      );
+
+      expect(result.groups[0].amountPerPerson, 3500);
+      expect(result.groups[1].amountPerPerson, 1000);
+      expect(result.groups.fold(0, (sum, group) => sum + group.totalAmount),
+          10000);
+    });
+
+    test('3グループでも残額を既存比率で再配分する', () {
+      const groups = [
+        SplitGroup(name: 'A', count: 1, weight: 3),
+        SplitGroup(name: 'B', count: 1, weight: 2),
+        SplitGroup(name: 'C', count: 1, weight: 1),
+      ];
+
+      final adjusted = adjustSplitGroupAmount(
+        totalAmount: 12000,
+        groups: groups,
+        changedIndex: 0,
+        amountPerPerson: 6000,
+      );
+      final result = calculateWeightedSplit(
+        totalAmount: 12000,
+        groups: adjusted,
+        unit: 1,
+      );
+
+      expect(result.groups[0].amountPerPerson, 6000);
+      expect(result.groups[1].amountPerPerson, 4000);
+      expect(result.groups[2].amountPerPerson, 2000);
+    });
+
+    test('チェックしたランクの金額だけを固定する', () {
+      const groups = [
+        SplitGroup(name: 'A', count: 1, weight: 6000),
+        SplitGroup(name: 'B', count: 1, weight: 4000),
+        SplitGroup(name: 'C', count: 1, weight: 2000),
+      ];
+
+      final adjusted = adjustSplitGroupAmount(
+        totalAmount: 12000,
+        groups: groups,
+        changedIndex: 1,
+        amountPerPerson: 5000,
+        lockedIndices: const {0},
+      );
+      final result = calculateWeightedSplit(
+        totalAmount: 12000,
+        groups: adjusted,
+        unit: 1,
+      );
+
+      expect(result.groups[0].amountPerPerson, 6000);
+      expect(result.groups[1].amountPerPerson, 5000);
+      expect(result.groups[2].amountPerPerson, 1000);
+    });
+
+    test('固定していない上段は中段変更時の自動配分対象になる', () {
+      const groups = [
+        SplitGroup(name: 'A', count: 1, weight: 6000),
+        SplitGroup(name: 'B', count: 1, weight: 4000),
+        SplitGroup(name: 'C', count: 1, weight: 2000),
+      ];
+
+      final adjusted = adjustSplitGroupAmount(
+        totalAmount: 12000,
+        groups: groups,
+        changedIndex: 1,
+        amountPerPerson: 5000,
+      );
+      final result = calculateWeightedSplit(
+        totalAmount: 12000,
+        groups: adjusted,
+        unit: 1,
+      );
+
+      expect(result.groups[0].amountPerPerson, 5250);
+      expect(result.groups[1].amountPerPerson, 5000);
+      expect(result.groups[2].amountPerPerson, 1750);
+    });
+  });
+
   group('端数の分け方（上のグループ内で1円単位）', () {
     test('1人あたりの金額は単位に四捨五入される', () {
       final result = calculateWeightedSplit(
@@ -97,7 +196,7 @@ void main() {
       }
     });
 
-    test('端数を負担するのは重みがいちばん大きいグループ', () {
+    test('端数を負担するのは一番上のグループ', () {
       final result = calculateWeightedSplit(
         totalAmount: 10001,
         groups: const [
@@ -105,8 +204,8 @@ void main() {
           SplitGroup(name: '重い', count: 2, weight: 2),
         ],
       );
-      expect(result.extraBearer?.group.name, '重い');
-      expect(result.groups[0].hasExtra, isFalse);
+      expect(result.extraBearer?.group.name, '軽い');
+      expect(result.groups[0].hasExtra, isTrue);
       expectTotalMatches(result, 10001);
     });
   });
@@ -187,7 +286,8 @@ void main() {
         withOrganizer.groups[0].amountWithExtra,
         withoutOrganizer.groups[0].amountWithExtra,
       );
-      expect(withOrganizer.collectAmount, lessThan(withoutOrganizer.collectAmount));
+      expect(withOrganizer.collectAmount,
+          lessThan(withoutOrganizer.collectAmount));
       expect(withoutOrganizer.collectAmount, 30000);
       expect(withoutOrganizer.payerCount, 5);
     });
@@ -345,7 +445,8 @@ void main() {
     test('validateSplitGroups は空・名前なし・人数0・重み0 を弾く', () {
       expect(validateSplitGroups(const []), isNotNull);
       expect(
-        validateSplitGroups(const [SplitGroup(name: '  ', count: 2, weight: 1)]),
+        validateSplitGroups(
+            const [SplitGroup(name: '  ', count: 2, weight: 1)]),
         isNotNull,
       );
       expect(

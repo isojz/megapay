@@ -142,6 +142,78 @@ class SplitResult {
 /// 割り振りの単位として選べる金額。
 const splitUnits = <int>[1, 100, 500, 1000];
 
+/// 集金者が割り勘の人数に加わらないことを明示的に選択した状態。
+/// null は未選択として区別する。
+const organizerNotParticipatingIndex = -1;
+
+/// 1グループの1人あたり金額を変更し、合計を維持したまま残りを自動調整する。
+///
+/// チェックされたグループの金額は固定し、残額は固定されていないほかの
+/// グループへ現在の比率で配分する。返される weight は金額比として扱えるため、既存の
+/// [calculateWeightedSplit] にそのまま渡せる。
+List<SplitGroup> adjustSplitGroupAmount({
+  required int totalAmount,
+  required List<SplitGroup> groups,
+  required int changedIndex,
+  required int amountPerPerson,
+  int unit = 1,
+  Set<int> lockedIndices = const {},
+}) {
+  if (changedIndex < 0 || changedIndex >= groups.length) {
+    throw RangeError.index(changedIndex, groups, 'changedIndex');
+  }
+  final adjustableIndices = {
+    for (var i = 0; i < groups.length; i++)
+      if (!lockedIndices.contains(i)) i,
+  };
+  if (groups.length < 2 ||
+      totalAmount <= 0 ||
+      lockedIndices.contains(changedIndex) ||
+      adjustableIndices.length < 2) {
+    return [...groups];
+  }
+
+  final changed = groups[changedIndex];
+  final currentAmounts = calculateWeightedSplit(
+    totalAmount: totalAmount,
+    groups: groups,
+    unit: unit,
+  ).groups.map((result) => result.amountPerPerson.toDouble()).toList();
+  final fixedCost = groups.indexed
+      .where((entry) => lockedIndices.contains(entry.$1))
+      .fold<double>(
+        0,
+        (sum, entry) => sum + entry.$2.count * currentAmounts[entry.$1],
+      );
+  final receiverCount = groups.indexed
+      .where((entry) =>
+          adjustableIndices.contains(entry.$1) && entry.$1 != changedIndex)
+      .fold<int>(0, (sum, entry) => sum + entry.$2.count);
+
+  // 自動調整されるランクにも最低1円を残す。
+  final available = totalAmount - fixedCost;
+  final maxAmount = ((available - receiverCount) / changed.count).floor();
+  final adjustedAmount =
+      amountPerPerson.clamp(1, maxAmount.clamp(1, totalAmount)).toInt();
+  final remaining = available - adjustedAmount * changed.count;
+  final receiverWeightedCount = groups.indexed
+      .where((entry) =>
+          adjustableIndices.contains(entry.$1) && entry.$1 != changedIndex)
+      .fold<double>(0, (sum, entry) => sum + entry.$2.count * entry.$2.weight);
+
+  return [
+    for (var i = 0; i < groups.length; i++)
+      if (lockedIndices.contains(i))
+        groups[i].copyWith(weight: currentAmounts[i])
+      else if (i == changedIndex)
+        groups[i].copyWith(weight: adjustedAmount.toDouble())
+      else
+        groups[i].copyWith(
+          weight: remaining * groups[i].weight / receiverWeightedCount,
+        ),
+  ];
+}
+
 /// 傾斜配分の入力が正しいかを判定する。問題がなければ null を返す。
 ///
 /// [organizerGroupIndex] を渡すと、集金者を含めたうえで
@@ -152,7 +224,7 @@ String? validateSplitGroups(
 }) {
   if (groups.isEmpty) return 'グループを1つ以上追加してください';
   for (final group in groups) {
-    if (group.name.trim().isEmpty) return 'グループ名を入力してください';
+    if (group.name.trim().isEmpty) return '役職名を入力してください';
     if (group.count < 1) return '各グループの人数は1人以上にしてください';
     if (group.weight <= 0) return '重みは0より大きい値にしてください';
   }
@@ -160,7 +232,7 @@ String? validateSplitGroups(
   if (totalCount < 2) return '合計人数は2人以上にしてください';
   if (organizerGroupIndex != null) {
     if (organizerGroupIndex < 0 || organizerGroupIndex >= groups.length) {
-      return '集金者のグループを選んでください';
+      return '集金者の役職を選んでください';
     }
     // 集金者を除いた人数が 0 だと集金する相手がいない
     if (totalCount - 1 < 1) return '集金する相手が1人以上必要です';
@@ -172,7 +244,7 @@ String? validateSplitGroups(
 ///
 /// 1 人あたりの金額は「合計 × 重み ÷ 重み付き人数の合計」を [unit] 単位に四捨五入した額。
 /// 500 円単位なら 249 円は切り捨てて 0 円に、250 円は切り上げて 500 円になる。
-/// 四捨五入で生じたずれ（足りない分・集めすぎた分）は、重みがいちばん大きいグループの
+/// 四捨五入で生じたずれ（足りない分・集めすぎた分）は、一番上のグループの
 /// 人たちで 1 円単位に分けて調整するため、配分後の合計は必ず [totalAmount] と一致する。
 ///
 /// [organizerGroupIndex] に集金者が属するグループを指定すると、集金者もグループの人数に
@@ -229,12 +301,8 @@ SplitResult calculateWeightedSplit({
   }
   final remainder = totalAmount - assigned;
 
-  // 3. ずれは重みがいちばん大きいグループの人たちで 1 円単位に分けて調整する
-  //    （重みが同じなら先に並んでいるグループ）
-  var topIndex = 0;
-  for (var i = 1; i < groups.length; i++) {
-    if (groups[i].weight > groups[topIndex].weight) topIndex = i;
-  }
+  // 3. ずれは一番上のランクの人たちで 1 円単位に分けて調整する。
+  const topIndex = 0;
   final topCount = groups[topIndex].count;
   // マイナスでも正しく分けるため floor で求める（Dart の ~/ は 0 方向に丸めるため使わない）
   final extraPerPerson = (remainder / topCount).floor();
@@ -265,35 +333,30 @@ class SplitPreset {
   final List<SplitGroup> groups;
 }
 
-/// よくある傾斜のパターン。人数は入力してもらう前提で 1 人ずつ入れておく。
+/// 利用シーン別の傾斜パターン。人数は選択後に調整してもらう前提で1人ずつ入れる。
 const splitPresets = <SplitPreset>[
   SplitPreset(
-    label: '2段階（多め・少なめ）',
+    label: '会社の飲み会',
     groups: [
-      SplitGroup(name: '多めに払う人', count: 1, weight: 1.5),
-      SplitGroup(name: '少なめに払う人', count: 1, weight: 1.0),
+      SplitGroup(name: '部長', count: 1, weight: 2.0),
+      SplitGroup(name: '課長', count: 1, weight: 1.5),
+      SplitGroup(name: '平社員', count: 1, weight: 1.0),
     ],
   ),
   SplitPreset(
-    label: '3段階（多め・普通・少なめ）',
+    label: 'サークル',
     groups: [
-      SplitGroup(name: '多めに払う人', count: 1, weight: 2.0),
-      SplitGroup(name: '普通', count: 1, weight: 1.5),
-      SplitGroup(name: '少なめに払う人', count: 1, weight: 1.0),
+      SplitGroup(name: 'OB・OG', count: 1, weight: 1.5),
+      SplitGroup(name: '現役メンバー', count: 1, weight: 1.0),
+      SplitGroup(name: '新入生', count: 1, weight: 0.5),
     ],
   ),
   SplitPreset(
-    label: '先輩・後輩',
+    label: '部活',
     groups: [
-      SplitGroup(name: '先輩', count: 1, weight: 2.0),
+      SplitGroup(name: '顧問・コーチ', count: 1, weight: 2.0),
+      SplitGroup(name: '先輩', count: 1, weight: 1.5),
       SplitGroup(name: '後輩', count: 1, weight: 1.0),
-    ],
-  ),
-  SplitPreset(
-    label: '飲む人・飲まない人',
-    groups: [
-      SplitGroup(name: '飲む人', count: 1, weight: 1.5),
-      SplitGroup(name: '飲まない人', count: 1, weight: 1.0),
     ],
   ),
 ];

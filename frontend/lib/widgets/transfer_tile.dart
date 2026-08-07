@@ -38,23 +38,28 @@ class TransferTile extends StatelessWidget {
           ].join('\n'),
         ),
         isThreeLine: true,
-        trailing: Column(
+        // ListTile は trailing の高さを 56px までに制限する。金額と保存ボタンを
+        // 縦に積むと合計がこの上限を超えやすく、端末やブラウザの文字サイズを
+        // 大きくしている環境ではみ出していた。横に並べれば高さは合計ではなく
+        // 「大きい方」で決まるため、文字が拡大されても崩れない。
+        trailing: Row(
           mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(
-              '$sign${formatMoney(record.currency, record.amount)}',
-              maxLines: 1,
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.bold, color: color),
+            Flexible(
+              child: Text(
+                '$sign${formatMoney(record.currency, record.amount)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.bold, color: color),
+              ),
             ),
-            // 高さ 24px では指で押しづらいので当たり判定を広げる。
-            // ただし ListTile は trailing の高さを 56px までに制限するため、
-            // 上の金額と合わせて収まる 32px にとどめ、幅で押しやすさを補う。
+            const SizedBox(width: 4),
+            // 以前は高さ 24px しかなく指で押しづらかった。横並びにしたことで
+            // 高さに余裕ができたので、押しやすい 40px を確保する。
             SizedBox(
-              height: 32,
-              width: 44,
+              height: 40,
+              width: 40,
               child: IconButton(
                 padding: EdgeInsets.zero,
                 tooltip: 'ユーザーを保存',

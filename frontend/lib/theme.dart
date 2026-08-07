@@ -306,12 +306,14 @@ ThemeData _buildTheme(Brightness brightness) {
     //
     // なお unselectedLabelStyle を省くと labelStyle がそのまま使われ、
     // 未選択側まで太字になって差が色だけになる。必ず両方指定すること。
+    // 塗りの色は同じ画面にある SegmentedButton（進行中 / 完了）に合わせる。
+    // 主張の強さが揃っていないと、同じ画面で選択状態の意味が読み取りにくい。
     tabBarTheme: TabBarThemeData(
-      labelColor: colorScheme.onPrimary,
+      labelColor: colorScheme.onSecondaryContainer,
       unselectedLabelColor: colorScheme.onSurfaceVariant,
       indicatorSize: TabBarIndicatorSize.tab,
       indicator: BoxDecoration(
-        color: colorScheme.primary,
+        color: colorScheme.secondaryContainer,
         borderRadius: BorderRadius.circular(megaPayControlRadius),
       ),
       dividerColor: Colors.transparent,

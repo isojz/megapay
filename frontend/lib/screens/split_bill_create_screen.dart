@@ -51,9 +51,11 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
   /// 割り振りの単位。きりのよい金額にしやすいよう既定を 500 円にする。
   final _unitNotifier = ValueNotifier<int>(500);
 
-  /// 集金者（自分）が属するグループ。既定は先頭のグループに加わる。
-  /// null にすると集金者は割り勘に加わらない。
-  final _organizerGroupNotifier = ValueNotifier<int?>(0);
+  /// 金額を自動再配分するときも維持するグループ。
+  final _lockedGroupsNotifier = ValueNotifier<Set<int>>(<int>{});
+
+  /// 集金者（自分）の扱い。null は未選択、-1 は「加わらない」。
+  final _organizerGroupNotifier = ValueNotifier<int?>(null);
 
   /// 合計金額の入力欄の現在値（傾斜の割り振り表示に使う）
   int? get _enteredAmount => int.tryParse(_amountController.text.trim());
@@ -62,6 +64,7 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
   void dispose() {
     _groupsNotifier.dispose();
     _unitNotifier.dispose();
+    _lockedGroupsNotifier.dispose();
     _organizerGroupNotifier.dispose();
     _titleController.dispose();
     _amountController.dispose();
@@ -126,11 +129,21 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
     final amount = _enteredAmount;
     final groups = _groupsNotifier.value;
     final unit = _unitNotifier.value;
-    // グループを減らしたあとに範囲外を指していないか確認する
-    final organizerIndex = _organizerGroupNotifier.value != null &&
-            _organizerGroupNotifier.value! < groups.length
-        ? _organizerGroupNotifier.value
-        : null;
+    final organizerSelection = _organizerGroupNotifier.value;
+    if (organizerSelection == null) {
+      _showError('集金者（あなた）の扱いを選択してください');
+      return;
+    }
+    final organizerIndex = organizerSelection == organizerNotParticipatingIndex
+        ? null
+        : organizerSelection >= 0 && organizerSelection < groups.length
+            ? organizerSelection
+            : null;
+    if (organizerSelection != organizerNotParticipatingIndex &&
+        organizerIndex == null) {
+      _showError('集金者の役職を選び直してください');
+      return;
+    }
     final error =
         validateSplitGroups(groups, organizerGroupIndex: organizerIndex);
     if (amount == null || amount <= 0) {
@@ -385,18 +398,25 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                                   ValueListenableBuilder<int?>(
                                 valueListenable: _organizerGroupNotifier,
                                 builder: (context, organizerIndex, _) =>
-                                    WeightedSplitEditor(
-                                  currency: _currency,
-                                  totalAmount: amount,
-                                  groups: groups,
-                                  onChanged: (value) =>
-                                      _groupsNotifier.value = value,
-                                  unit: unit,
-                                  onUnitChanged: (value) =>
-                                      _unitNotifier.value = value,
-                                  organizerGroupIndex: organizerIndex,
-                                  onOrganizerGroupChanged: (value) =>
-                                      _organizerGroupNotifier.value = value,
+                                    ValueListenableBuilder<Set<int>>(
+                                  valueListenable: _lockedGroupsNotifier,
+                                  builder: (context, lockedGroups, _) =>
+                                      WeightedSplitEditor(
+                                    currency: _currency,
+                                    totalAmount: amount,
+                                    groups: groups,
+                                    onChanged: (value) =>
+                                        _groupsNotifier.value = value,
+                                    unit: unit,
+                                    onUnitChanged: (value) =>
+                                        _unitNotifier.value = value,
+                                    organizerGroupIndex: organizerIndex,
+                                    onOrganizerGroupChanged: (value) =>
+                                        _organizerGroupNotifier.value = value,
+                                    lockedGroupIndices: lockedGroups,
+                                    onLockedGroupIndicesChanged: (value) =>
+                                        _lockedGroupsNotifier.value = value,
+                                  ),
                                 ),
                               ),
                             );
