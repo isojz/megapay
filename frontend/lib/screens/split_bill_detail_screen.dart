@@ -15,6 +15,29 @@ class _DetailData {
   final List<SplitBillParticipant> participants;
 }
 
+List<String?> _emptySlotRankLabels(
+  SplitBill bill,
+  List<SplitBillParticipant> participants,
+  int emptySlotCount,
+) {
+  if (!bill.isRanked) return List.filled(emptySlotCount, null);
+
+  final labels = <String?>[];
+  for (final rank in bill.ranks) {
+    final capacity = rank.capacity ?? 0;
+    final joinedCount = participants
+        .where((participant) => participant.rankCode == rank.rankCode)
+        .length;
+    final vacancies = (capacity - joinedCount).clamp(0, capacity);
+    labels.addAll(List.filled(vacancies, rank.label));
+  }
+
+  if (labels.length > emptySlotCount) {
+    return labels.take(emptySlotCount).toList();
+  }
+  return [...labels, ...List.filled(emptySlotCount - labels.length, null)];
+}
+
 /// グループ画面：割り勘の内容と、参加者ごとの支払い状況を一覧で表示する。
 /// 自分が未払いの場合はここから支払いに進める。
 class SplitBillDetailScreen extends StatefulWidget {
@@ -177,6 +200,8 @@ class _SplitBillDetailScreenState extends State<SplitBillDetailScreen> {
           final participants = snapshot.data!.participants;
           final emptySlotCount =
               (bill.expectedPayerCount - participants.length).clamp(0, 100);
+          final emptySlotRankLabels =
+              _emptySlotRankLabels(bill, participants, emptySlotCount);
           return RefreshIndicator(
             onRefresh: _reload,
             child: Center(
@@ -241,6 +266,7 @@ class _SplitBillDetailScreenState extends State<SplitBillDetailScreen> {
                       emptySlotCount,
                       (index) => _EmptyParticipantTile(
                         slotNumber: participants.length + index + 2,
+                        rankLabel: emptySlotRankLabels[index],
                       ),
                     ),
                     // 削除は戻せない操作なので、参加者一覧より下に置いて
@@ -412,9 +438,10 @@ class _OrganizerTile extends StatelessWidget {
 }
 
 class _EmptyParticipantTile extends StatelessWidget {
-  const _EmptyParticipantTile({required this.slotNumber});
+  const _EmptyParticipantTile({required this.slotNumber, this.rankLabel});
 
   final int slotNumber;
+  final String? rankLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -426,7 +453,11 @@ class _EmptyParticipantTile extends StatelessWidget {
           backgroundColor: theme.colorScheme.surfaceContainerHighest,
           child: Icon(Icons.person_outline, color: theme.colorScheme.outline),
         ),
-        title: Text('参加者 $slotNumber：未参加'),
+        title: Text(
+          rankLabel == null
+              ? '参加者 $slotNumber：未参加'
+              : '$rankLabel：未参加',
+        ),
         subtitle: const Text('参加者を待っています'),
         trailing: Icon(Icons.hourglass_empty, color: theme.colorScheme.outline),
       ),
@@ -486,6 +517,16 @@ class _ParticipantTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final paid = participant.isPaid;
+    final participantSummary = '${participant.userId}'
+        '${participant.rankLabel == null ? '' : '・${participant.rankLabel}'}';
+    final paymentSummary = paid
+        ? [
+            participantSummary,
+            if (participant.paidAt != null)
+              '${formatDateTime(participant.paidAt!)} に支払い',
+            '支払い方法：${participant.paymentMethodLabel}',
+          ].join('\n')
+        : participantSummary;
     return Card(
       child: ListTile(
         leading: CircleAvatar(
@@ -505,16 +546,8 @@ class _ParticipantTile extends StatelessWidget {
           '${participant.displayName} さん'
           '${participant.isMe ? '（あなた）' : ''}',
         ),
-        subtitle: Text(
-          paid && participant.paidAt != null
-              ? '${participant.userId}'
-                  '${participant.rankLabel == null ? '' : '・${participant.rankLabel}'}\n'
-                  '${formatDateTime(participant.paidAt!)} に'
-                  '${participant.isPaidByCash ? '現金で' : ''}支払い'
-              : '${participant.userId}'
-                  '${participant.rankLabel == null ? '' : '・${participant.rankLabel}'}',
-        ),
-        isThreeLine: paid && participant.paidAt != null,
+        subtitle: Text(paymentSummary),
+        isThreeLine: paid,
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,

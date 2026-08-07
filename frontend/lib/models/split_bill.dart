@@ -196,6 +196,12 @@ class SplitBillParticipant {
 
   bool get isPaid => status == 'paid';
   bool get isPaidByCash => isPaid && paymentMethod == 'cash';
+  String get paymentMethodLabel => switch (paymentMethod) {
+        'balance' => 'MegaPay残高',
+        'cash' => '現金',
+        'external' => '外部決済（PayPay・クレジットカード等）',
+        _ => paymentMethod,
+      };
   String get statusLabel =>
       isPaid ? (isPaidByCash ? '現金で受取済み' : '支払い済み') : '未払い';
 
