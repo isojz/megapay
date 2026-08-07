@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/models.dart';
 import '../utils/money.dart';
@@ -20,7 +21,16 @@ class _DepositScreenState extends State<DepositScreen> {
   /// 現在は日本円のみ入金できる。
   static const _currency = 'JPY';
 
+  final _formKey = GlobalKey<FormState>();
+  final _amountController = TextEditingController();
+
   String? _selectedMethod;
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
 
   Balance? get _selectedBalance {
     for (final balance in widget.balances) {
@@ -39,6 +49,8 @@ class _DepositScreenState extends State<DepositScreen> {
   }
 
   void _goNext() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
     if (_selectedMethod == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -48,9 +60,13 @@ class _DepositScreenState extends State<DepositScreen> {
       return;
     }
 
+    final amount = _amountController.text.trim();
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$_selectedMethodを選択しました'),
+        content: Text(
+          '${formatMoney(_currency, amount)} を$_selectedMethodで入金します',
+        ),
       ),
     );
 
@@ -68,69 +84,95 @@ class _DepositScreenState extends State<DepositScreen> {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '現在の残高（日本円）',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        selectedBalance == null
-                            ? '残高がありません'
-                            : formatMoney(
-                                selectedBalance.currency,
-                                selectedBalance.amount,
-                              ),
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                    ],
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '現在の残高（日本円）',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          selectedBalance == null
+                              ? '残高がありません'
+                              : formatMoney(
+                                  selectedBalance.currency,
+                                  selectedBalance.amount,
+                                ),
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                '入金方法',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 12),
-              _DepositMethodButton(
-                icon: Icons.account_balance_outlined,
-                label: '指定口座',
-                selected: _selectedMethod == '指定口座',
-                onPressed: () => _selectMethod('指定口座'),
-              ),
-              const SizedBox(height: 12),
-              _DepositMethodButton(
-                icon: Icons.account_balance_wallet_outlined,
-                label: 'PayPay',
-                selected: _selectedMethod == 'PayPay',
-                onPressed: () => _selectMethod('PayPay'),
-              ),
-              const SizedBox(height: 12),
-              _DepositMethodButton(
-                icon: Icons.credit_card,
-                label: 'クレジットカード',
-                selected: _selectedMethod == 'クレジットカード',
-                onPressed: () => _selectMethod('クレジットカード'),
-              ),
-              const SizedBox(height: 24),
-              FilledButton.icon(
-                onPressed: _goNext,
-                icon: const Icon(Icons.arrow_forward),
-                label: const Text('次へ'),
-              ),
-            ],
+                const SizedBox(height: 24),
+                Text(
+                  '入金額',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _amountController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: const InputDecoration(
+                    labelText: '金額',
+                    suffixText: '円',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    final amount = int.tryParse(value?.trim() ?? '');
+                    if (amount == null || amount <= 0) {
+                      return '正しい金額を入力してください';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  '入金方法',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 12),
+                _DepositMethodButton(
+                  icon: Icons.account_balance_outlined,
+                  label: '指定口座',
+                  selected: _selectedMethod == '指定口座',
+                  onPressed: () => _selectMethod('指定口座'),
+                ),
+                const SizedBox(height: 12),
+                _DepositMethodButton(
+                  icon: Icons.account_balance_wallet_outlined,
+                  label: 'PayPay',
+                  selected: _selectedMethod == 'PayPay',
+                  onPressed: () => _selectMethod('PayPay'),
+                ),
+                const SizedBox(height: 12),
+                _DepositMethodButton(
+                  icon: Icons.credit_card,
+                  label: 'クレジットカード',
+                  selected: _selectedMethod == 'クレジットカード',
+                  onPressed: () => _selectMethod('クレジットカード'),
+                ),
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  onPressed: _goNext,
+                  icon: const Icon(Icons.arrow_forward),
+                  label: const Text('次へ'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
