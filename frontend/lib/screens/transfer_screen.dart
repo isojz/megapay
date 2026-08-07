@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../models/models.dart';
 import '../services/api_client.dart';
+import '../theme.dart';
 import '../utils/money.dart';
+import '../widgets/app_bar_title.dart';
 import '../widgets/saved_user_picker.dart';
 import '../utils/input_formatters.dart';
 
@@ -207,7 +209,9 @@ class _TransferScreenState extends State<TransferScreen> {
   Widget build(BuildContext context) {
     final selectedBalance = _selectedBalance;
     return Scaffold(
-      appBar: AppBar(title: const Text('送金')),
+      appBar: AppBar(
+        title: const AppBarTitle(icon: Icons.send_outlined, title: '送金'),
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -276,10 +280,12 @@ class _TransferScreenState extends State<TransferScreen> {
                   ),
                   if (_verifiedRecipient != null)
                     Card(
-                      color: Colors.green.shade50,
+                      color: MegaPaySemantics.of(context).successContainer,
                       child: ListTile(
-                        leading:
-                            const Icon(Icons.check_circle, color: Colors.green),
+                        leading: Icon(
+                          Icons.check_circle,
+                          color: MegaPaySemantics.of(context).success,
+                        ),
                         title: Text('${_verifiedRecipient!.displayName} さん'),
                         subtitle: Text(_verifiedRecipient!.userId),
                       ),
@@ -298,16 +304,17 @@ class _TransferScreenState extends State<TransferScreen> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _amountController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: decimalAmountInputFormatters,
+                    // 日本円は小数を扱わない。整数キーボード＋整数フォーマッタにして、
+                    // 「100.5」のように表示（101 円）と送信値（100.5）がずれるのを防ぐ。
+                    keyboardType: TextInputType.number,
+                    inputFormatters: integerAmountInputFormatters,
                     decoration: const InputDecoration(
                       labelText: '送金金額',
                       suffixText: '円',
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
-                      final amount = double.tryParse(value?.trim() ?? '');
+                      final amount = int.tryParse(value?.trim() ?? '');
                       if (amount == null || amount <= 0) {
                         return '正しい金額を入力してください';
                       }

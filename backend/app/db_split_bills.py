@@ -95,3 +95,8 @@ def list_participants(token: str, code: str) -> list[dict[str, Any]]:
 def list_my_split_bills(token: str, limit: int = 50) -> list[dict[str, Any]]:
     res = _client(token).rpc("list_my_split_bills", {"p_limit": limit}).execute()
     return res.data
+
+
+def delete_split_bill(token: str, code: str) -> dict[str, Any]:
+    res = _client(token).rpc("delete_split_bill", {"p_code": code}).execute()
+    return res.data

@@ -5,6 +5,7 @@ import '../models/split_bill.dart';
 import '../services/api_client.dart';
 import '../utils/browser_url.dart';
 import '../utils/money.dart';
+import '../widgets/app_bar_title.dart';
 import 'split_bill_payment_mock_screen.dart';
 
 class _DetailData {
@@ -27,6 +28,9 @@ class SplitBillDetailScreen extends StatefulWidget {
 
 class _SplitBillDetailScreenState extends State<SplitBillDetailScreen> {
   late Future<_DetailData> _future;
+
+  /// 削除の通信中。二重に押せないようボタンを止めるために持つ。
+  bool _deleting = false;
 
   @override
   void initState() {
@@ -85,10 +89,61 @@ class _SplitBillDetailScreenState extends State<SplitBillDetailScreen> {
     await _reload();
   }
 
+  /// 集金者が割り勘そのものを取り消す。
+  /// 参加者あての請求も消えるため、実行前に必ず確認をとる。
+  Future<void> _delete(SplitBill bill) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('この割り勘を削除しますか？'),
+        content: Text(
+          bill.joinedCount > 0
+              ? '「${bill.title}」を削除します。\n'
+                  '参加している ${bill.joinedCount} 人あての請求も取り消されます。'
+                  '元に戻すことはできません。'
+              : '「${bill.title}」を削除します。元に戻すことはできません。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('やめる'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('削除する'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _deleting = true);
+    try {
+      await ApiClient.instance.deleteSplitBill(bill.billCode);
+      messenger.showSnackBar(
+        SnackBar(content: Text('「${bill.title}」を削除しました')),
+      );
+      // 削除後はこの画面の対象が無くなるので一覧へ戻る
+      navigator.pop();
+    } catch (err) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      messenger.showSnackBar(
+        SnackBar(content: Text(err.toString())),
+      );
+      // 他の人が先に支払っていた場合など、状態が変わっている可能性がある
+      await _reload();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('割り勘グループ')),
+      appBar: AppBar(
+        title: const AppBarTitle(icon: Icons.groups, title: '割り勘グループ'),
+      ),
       body: FutureBuilder<_DetailData>(
         future: _future,
         builder: (context, snapshot) {
@@ -188,6 +243,37 @@ class _SplitBillDetailScreenState extends State<SplitBillDetailScreen> {
                         slotNumber: participants.length + index + 2,
                       ),
                     ),
+                    // 削除は戻せない操作なので、参加者一覧より下に置いて
+                    // 誤って押しにくくする。支払った人が 1 人でもいると
+                    // 集金の記録が追えなくなるため、その場合は出さない。
+                    if (bill.isOrganizer && bill.paidCount == 0) ...[
+                      const SizedBox(height: 32),
+                      const Divider(),
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: _deleting ? null : () => _delete(bill),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Theme.of(context).colorScheme.error,
+                        ),
+                        icon: _deleting
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.delete_outline),
+                        label: const Text('この割り勘を削除'),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        bill.joinedCount > 0
+                            ? 'まだ誰も支払っていないため削除できます。'
+                                '参加者あての請求も一緒に取り消されます。'
+                            : 'まだ誰も支払っていないため削除できます。',
+                        style: Theme.of(context).textTheme.bodySmall,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ],
                 ),
               ),

@@ -91,6 +91,21 @@ class ApiClient {
     return _decode(res);
   }
 
+  Future<dynamic> _delete(String path) async {
+    final http.Response res;
+
+    try {
+      res = await http.delete(
+        _uri(path),
+        headers: _headers,
+      );
+    } catch (_) {
+      throw ApiException(0, 'サーバーに接続できませんでした');
+    }
+
+    return _decode(res);
+  }
+
   dynamic _decode(http.Response res) {
     final dynamic body = res.bodyBytes.isEmpty
         ? null
@@ -211,7 +226,8 @@ class ApiClient {
   /// PayPay・カードなどの外部決済で支払う。
   /// 引き落としは外部の決済事業者側で行われる想定のため、自分の残高は減らない。
   /// 集金者の残高と、双方の送金履歴には反映される。
-  Future<PaymentRequest> payPaymentRequestByExternal(String requestCode) async =>
+  Future<PaymentRequest> payPaymentRequestByExternal(
+          String requestCode) async =>
       PaymentRequest.fromJson(
         await _post(
           '/api/v1/payment-requests/${Uri.encodeComponent(requestCode)}/pay-external',
@@ -357,6 +373,13 @@ class ApiClient {
             ),
           )
           .toList();
+
+  /// 作成した割り勘を取り消す（集金者のみ・まだ誰も支払っていない場合）
+  Future<void> deleteSplitBill(String billCode) async {
+    await _delete(
+      '/api/v1/split-bills/${Uri.encodeComponent(billCode)}',
+    );
+  }
 
   /// 自分が関わる割り勘の一覧（集金した分・参加した分）
   Future<List<SplitBill>> fetchSplitBills() async =>

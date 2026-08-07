@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_client.dart';
 import '../widgets/transfer_tile.dart';
+import '../widgets/app_bar_title.dart';
 
 /// 履歴一覧画面：送金・受取の履歴を新しい順にまとめて表示する。
 ///
@@ -77,7 +78,9 @@ class _TransferHistoryScreenState extends State<TransferHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('履歴一覧')),
+      appBar: AppBar(
+        title: const AppBarTitle(icon: Icons.history, title: '履歴一覧'),
+      ),
       body: FutureBuilder<List<TransferRecord>>(
         future: _future,
         builder: (context, snapshot) {
@@ -93,7 +96,8 @@ class _TransferHistoryScreenState extends State<TransferHistoryScreen> {
                   children: [
                     const Icon(Icons.error_outline, size: 48),
                     const SizedBox(height: 12),
-                    Text(snapshot.error.toString(), textAlign: TextAlign.center),
+                    Text(snapshot.error.toString(),
+                        textAlign: TextAlign.center),
                     const SizedBox(height: 16),
                     FilledButton.icon(
                       onPressed: _reload,

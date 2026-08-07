@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../screens/deposit_screen.dart';
 import '../screens/join_split_bill_screen.dart';
 import '../models/models.dart';
 import '../screens/pay_request_screen.dart';
@@ -72,7 +73,7 @@ class PaymentRequestActions extends StatelessWidget {
             ),
             sectionGap,
             _ActionSection(
-              title: '送金・出金',
+              title: 'お金の移動',
               children: [
                 _ActionItem(
                   icon: Icons.send_outlined,
@@ -85,6 +86,14 @@ class PaymentRequestActions extends StatelessWidget {
                   onTap: () => _open(
                     context,
                     WithdrawScreen(balances: balances),
+                  ),
+                ),
+                _ActionItem(
+                  icon: Icons.add_card,
+                  label: '入金',
+                  onTap: () => _open(
+                    context,
+                    DepositScreen(balances: balances),
                   ),
                 ),
               ],

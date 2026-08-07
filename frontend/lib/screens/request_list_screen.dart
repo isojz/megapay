@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/payment_request.dart';
 import '../services/api_client.dart';
 import '../widgets/payment_request_tile.dart';
+import '../widgets/app_bar_title.dart';
 import 'pay_request_screen.dart';
 
 /// 請求状況の確認画面：自分が請求した／請求された一覧を新しい順に表示する。
@@ -92,7 +93,12 @@ class _RequestListScreenState extends State<RequestListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('請求状況')),
+      appBar: AppBar(
+        title: const AppBarTitle(
+          icon: Icons.fact_check_outlined,
+          title: '請求状況',
+        ),
+      ),
       body: FutureBuilder<List<PaymentRequest>>(
         future: _future,
         builder: (context, snapshot) {
@@ -108,7 +114,8 @@ class _RequestListScreenState extends State<RequestListScreen> {
                   children: [
                     const Icon(Icons.error_outline, size: 48),
                     const SizedBox(height: 12),
-                    Text(snapshot.error.toString(), textAlign: TextAlign.center),
+                    Text(snapshot.error.toString(),
+                        textAlign: TextAlign.center),
                     const SizedBox(height: 16),
                     FilledButton.icon(
                       onPressed: _reload,

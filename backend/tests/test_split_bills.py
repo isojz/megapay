@@ -399,3 +399,51 @@ def test_create_ranked_split_bill_from_weighted_groups(client, monkeypatch):
         "capacity": 2,
     }
     assert res.json()["allocation_mode"] == "ranked"
+
+
+def test_delete_split_bill_requires_auth():
+    with TestClient(app) as test_client:
+        res = test_client.delete(f"{BASE}/SP-ABCD2345")
+    assert res.status_code == 401
+
+
+def test_delete_split_bill_passes_trimmed_code(client, monkeypatch):
+    captured = {}
+
+    def fake_delete(token, code):
+        captured.update(token=token, code=code)
+        return {"bill_code": code, "title": "歓迎会", "deleted": True}
+
+    monkeypatch.setattr(db, "delete_split_bill", fake_delete)
+
+    res = client.delete(f"{BASE}/%20SP-ABCD2345%20")
+
+    assert res.status_code == 204
+    assert res.content == b""
+    assert captured["code"] == "SP-ABCD2345"
+    assert captured["token"] == TEST_USER.token
+
+
+def test_delete_split_bill_rejects_when_someone_paid(client, monkeypatch):
+    def fake_delete(token, code):
+        raise _api_error("SPLIT_BILL_ALREADY_PAID")
+
+    monkeypatch.setattr(db, "delete_split_bill", fake_delete)
+
+    res = client.delete(f"{BASE}/SP-ABCD2345")
+
+    assert res.status_code == 409
+    assert res.json()["detail"] == "すでに支払った人がいるため削除できません"
+
+
+def test_delete_split_bill_hides_other_users_bill(client, monkeypatch):
+    """集金者以外には 404 を返し、割り勘の存在自体を知らせない。"""
+
+    def fake_delete(token, code):
+        raise _api_error("SPLIT_BILL_NOT_FOUND")
+
+    monkeypatch.setattr(db, "delete_split_bill", fake_delete)
+
+    res = client.delete(f"{BASE}/SP-ABCD2345")
+
+    assert res.status_code == 404

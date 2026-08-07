@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
+import '../theme.dart';
 import '../utils/money.dart';
 
 /// 送金・受取 1 件分の表示。ホームの直近履歴と履歴一覧画面で共用する。
@@ -13,14 +14,15 @@ class TransferTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final semantics = MegaPaySemantics.of(context);
     final sent = record.isSent;
     final sign = sent ? '-' : '+';
-    final color = sent ? theme.colorScheme.onSurface : Colors.green.shade700;
+    final color = sent ? semantics.negativeAmount : semantics.positiveAmount;
     return Card(
       child: ListTile(
         leading: Icon(
           sent ? Icons.arrow_upward : Icons.arrow_downward,
-          color: sent ? theme.colorScheme.primary : Colors.green.shade700,
+          color: sent ? theme.colorScheme.primary : semantics.positiveAmount,
         ),
         title: Text(
           sent
@@ -36,22 +38,30 @@ class TransferTile extends StatelessWidget {
           ].join('\n'),
         ),
         isThreeLine: true,
-        trailing: Column(
+        // ListTile は trailing の高さを 56px までに制限する。金額と保存ボタンを
+        // 縦に積むと合計がこの上限を超えやすく、端末やブラウザの文字サイズを
+        // 大きくしている環境ではみ出していた。横に並べれば高さは合計ではなく
+        // 「大きい方」で決まるため、文字が拡大されても崩れない。
+        trailing: Row(
           mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(
-              '$sign${formatMoney(record.currency, record.amount)}',
-              maxLines: 1,
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.bold, color: color),
+            Flexible(
+              child: Text(
+                '$sign${formatMoney(record.currency, record.amount)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.bold, color: color),
+              ),
             ),
+            const SizedBox(width: 4),
+            // 以前は高さ 24px しかなく指で押しづらかった。横並びにしたことで
+            // 高さに余裕ができたので、押しやすい 40px を確保する。
             SizedBox(
-              height: 24,
+              height: 40,
+              width: 40,
               child: IconButton(
                 padding: EdgeInsets.zero,
-                visualDensity: VisualDensity.compact,
                 tooltip: 'ユーザーを保存',
                 onPressed: onSave,
                 icon: const Icon(Icons.bookmark_add_outlined, size: 20),

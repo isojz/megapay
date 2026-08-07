@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../models/split_bill.dart';
 import '../services/api_client.dart';
+import '../theme.dart';
 import '../utils/money.dart';
+import '../widgets/app_bar_title.dart';
 import 'split_bill_detail_screen.dart';
 
 /// 割り勘一覧：自分が集金する分と、参加している分をまとめて表示する。
@@ -13,14 +15,29 @@ class SplitBillListScreen extends StatefulWidget {
   State<SplitBillListScreen> createState() => _SplitBillListScreenState();
 }
 
-class _SplitBillListScreenState extends State<SplitBillListScreen> {
+class _SplitBillListScreenState extends State<SplitBillListScreen>
+    with SingleTickerProviderStateMixin {
   late Future<List<SplitBill>> _future;
   _ListStatus _status = _ListStatus.inProgress;
+
+  /// 選択中のタブでアイコンを塗りつぶしに変えるため、自前で持って監視する。
+  /// DefaultTabController のままだと切り替えを検知できない。
+  late final TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this)
+      ..addListener(() {
+        if (mounted) setState(() {});
+      });
     _future = ApiClient.instance.fetchSplitBills();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _reload() {
@@ -118,66 +135,89 @@ class _SplitBillListScreenState extends State<SplitBillListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('割り勘一覧'),
-          // タブは赤いヘッダーの上ではなく、一覧のカードと同じ明るい面に載せる。
-          // 赤地に白文字だと選択中と未選択が見分けにくいため。
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(72),
-            child: ColoredBox(
-              color: Theme.of(context).colorScheme.surface,
-              child: const TabBar(
+    final selectedIndex = _tabController.index;
+    return Scaffold(
+      appBar: AppBar(
+        title: const AppBarTitle(icon: Icons.groups, title: '割り勘一覧'),
+        // タブは赤いヘッダーの上ではなく、一覧のカードと同じ明るい面に載せる。
+        // 赤地に白文字だと選択中と未選択が見分けにくいため。
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(64),
+          child: ColoredBox(
+            color: Theme.of(context).colorScheme.surface,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: TabBar(
+                controller: _tabController,
+                // 選択中は塗りつぶしになるので、下線とタブ間の余白は消す
+                indicatorPadding: EdgeInsets.zero,
+                splashBorderRadius: BorderRadius.circular(megaPayControlRadius),
                 tabs: [
-                  Tab(icon: Icon(Icons.groups_outlined), text: '集金者'),
-                  Tab(icon: Icon(Icons.person_outline), text: '支払者'),
+                  Tab(
+                    height: 44,
+                    // 選択中は塗りつぶしのアイコンにして、色以外の手がかりも足す
+                    icon: Icon(
+                      selectedIndex == 0 ? Icons.groups : Icons.groups_outlined,
+                      size: 20,
+                    ),
+                    iconMargin: EdgeInsets.zero,
+                    text: '集金者',
+                  ),
+                  Tab(
+                    height: 44,
+                    icon: Icon(
+                      selectedIndex == 1 ? Icons.person : Icons.person_outline,
+                      size: 20,
+                    ),
+                    iconMargin: EdgeInsets.zero,
+                    text: '支払者',
+                  ),
                 ],
               ),
             ),
           ),
         ),
-        body: FutureBuilder<List<SplitBill>>(
-          future: _future,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.error_outline, size: 48),
-                      const SizedBox(height: 12),
-                      Text(snapshot.error.toString(),
-                          textAlign: TextAlign.center),
-                      const SizedBox(height: 16),
-                      FilledButton.icon(
-                        onPressed: _reload,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('再読み込み'),
-                      ),
-                    ],
-                  ),
+      ),
+      body: FutureBuilder<List<SplitBill>>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline, size: 48),
+                    const SizedBox(height: 12),
+                    Text(snapshot.error.toString(),
+                        textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: _reload,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('再読み込み'),
+                    ),
+                  ],
                 ),
-              );
-            }
-
-            final bills = List<SplitBill>.from(
-              snapshot.data ?? const <SplitBill>[],
-            )..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-            return TabBarView(
-              children: [
-                _buildRoleList(bills, organizer: true),
-                _buildRoleList(bills, organizer: false),
-              ],
+              ),
             );
-          },
-        ),
+          }
+
+          final bills = List<SplitBill>.from(
+            snapshot.data ?? const <SplitBill>[],
+          )..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return TabBarView(
+            controller: _tabController,
+            children: [
+              _buildRoleList(bills, organizer: true),
+              _buildRoleList(bills, organizer: false),
+            ],
+          );
+        },
       ),
     );
   }

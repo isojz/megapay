@@ -6,6 +6,7 @@ import '../services/api_client.dart';
 import '../utils/browser_url.dart';
 import '../utils/money.dart';
 import '../widgets/payment_method_selector.dart';
+import '../widgets/app_bar_title.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 import 'split_bill_payment_mock_screen.dart';
@@ -198,7 +199,12 @@ class _SplitBillLinkFlowScreenState extends State<SplitBillLinkFlowScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('割り勘の支払い')),
+      appBar: AppBar(
+        title: const AppBarTitle(
+          icon: Icons.payments_outlined,
+          title: '割り勘の支払い',
+        ),
+      ),
       body: FutureBuilder<PublicSplitBill>(
         future: _future,
         builder: (context, snapshot) {

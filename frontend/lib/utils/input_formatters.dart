@@ -32,6 +32,16 @@ abstract class _CharMapFormatter extends TextInputFormatter {
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
+    // 日本語入力で変換中（未確定）の文字列には手を触れない。
+    //
+    // 変換中に文字を取り除くと、IME が持っている変換候補と入力欄の中身が
+    // ずれる。ずれたまま確定すると、予測変換の文字がそのまま残ったうえに
+    // バックスペースでも消せない状態になる。
+    // 変換が確定すると composing は空になり、そこで初めて変換をかける。
+    if (newValue.composing.isValid && !newValue.composing.isCollapsed) {
+      return newValue;
+    }
+
     final text = _convert(newValue.text);
 
     // カーソル位置は「カーソルより前の部分を変換した長さ」に合わせる。

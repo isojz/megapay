@@ -6,6 +6,7 @@ import '../utils/money.dart';
 import '../widgets/payment_request_tile.dart';
 import '../widgets/payment_method_selector.dart';
 import '../utils/input_formatters.dart';
+import '../widgets/app_bar_title.dart';
 
 /// 請求コードを入力して支払う画面。
 /// 一覧から開く場合は [initialCode] を渡すと自動で内容を取得する。
@@ -165,7 +166,11 @@ class _PayRequestScreenState extends State<PayRequestScreen> {
         widget.initialCode != null && widget.initialCode!.isNotEmpty;
     return Scaffold(
       appBar: AppBar(
-        title: Text(openedFromRequestList ? '請求の支払い' : '請求コードで支払う'),
+        title: AppBarTitle(
+          icon:
+              openedFromRequestList ? Icons.payments_outlined : Icons.password,
+          title: openedFromRequestList ? '請求の支払い' : '請求コードで支払う',
+        ),
       ),
       body: Center(
         child: SingleChildScrollView(

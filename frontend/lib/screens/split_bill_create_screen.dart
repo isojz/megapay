@@ -6,7 +6,9 @@ import '../services/api_client.dart';
 import '../utils/money.dart';
 import '../utils/browser_url.dart';
 import '../utils/weighted_split.dart';
+import '../widgets/remainder_roulette_editor.dart';
 import '../widgets/weighted_split_editor.dart';
+import '../widgets/app_bar_title.dart';
 import 'split_bill_detail_screen.dart';
 import '../utils/input_formatters.dart';
 
@@ -38,6 +40,7 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
   final _countController = TextEditingController();
 
   bool _isCreating = false;
+  bool _useRemainderRoulette = false;
 
   /// 分け方。既定は等分で、必要なときだけ傾斜に切り替える。
   _SplitMode _mode = _SplitMode.even;
@@ -51,9 +54,11 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
   /// 割り振りの単位。きりのよい金額にしやすいよう既定を 500 円にする。
   final _unitNotifier = ValueNotifier<int>(500);
 
-  /// 集金者（自分）が属するグループ。既定は先頭のグループに加わる。
-  /// null にすると集金者は割り勘に加わらない。
-  final _organizerGroupNotifier = ValueNotifier<int?>(0);
+  /// 金額を自動再配分するときも維持するグループ。
+  final _lockedGroupsNotifier = ValueNotifier<Set<int>>(<int>{});
+
+  /// 集金者（自分）の扱い。null は未選択、-1 は「加わらない」。
+  final _organizerGroupNotifier = ValueNotifier<int?>(null);
 
   /// 合計金額の入力欄の現在値（傾斜の割り振り表示に使う）
   int? get _enteredAmount => int.tryParse(_amountController.text.trim());
@@ -62,6 +67,7 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
   void dispose() {
     _groupsNotifier.dispose();
     _unitNotifier.dispose();
+    _lockedGroupsNotifier.dispose();
     _organizerGroupNotifier.dispose();
     _titleController.dispose();
     _amountController.dispose();
@@ -126,11 +132,21 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
     final amount = _enteredAmount;
     final groups = _groupsNotifier.value;
     final unit = _unitNotifier.value;
-    // グループを減らしたあとに範囲外を指していないか確認する
-    final organizerIndex = _organizerGroupNotifier.value != null &&
-            _organizerGroupNotifier.value! < groups.length
-        ? _organizerGroupNotifier.value
-        : null;
+    final organizerSelection = _organizerGroupNotifier.value;
+    if (organizerSelection == null) {
+      _showError('集金者（あなた）の扱いを選択してください');
+      return;
+    }
+    final organizerIndex = organizerSelection == organizerNotParticipatingIndex
+        ? null
+        : organizerSelection >= 0 && organizerSelection < groups.length
+            ? organizerSelection
+            : null;
+    if (organizerSelection != organizerNotParticipatingIndex &&
+        organizerIndex == null) {
+      _showError('集金者の役職を選び直してください');
+      return;
+    }
     final error =
         validateSplitGroups(groups, organizerGroupIndex: organizerIndex);
     if (amount == null || amount <= 0) {
@@ -255,10 +271,72 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
       }
     }
 
+    await _persistRankedBill(
+      title: title.isEmpty ? _defaultTitle : title,
+      ranks: ranks,
+    );
+  }
+
+  /// 個人名は作成確定前の表示に使い、既存APIには金額別の枠として保存する。
+  Future<void> _createRemainderRoulette(
+    RemainderRouletteSubmission submission,
+  ) async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    final result = submission.result;
+    final external = [
+      for (var index = 0; index < result.payments.length; index++)
+        if (index != submission.organizerIndex)
+          (index: index, amount: result.payments[index]),
+    ];
+    if (external.isEmpty) {
+      _showError('請求する相手が1人以上必要です');
+      return;
+    }
+    if (external.any((payment) => payment.amount <= 0)) {
+      _showError('0円の参加者がいます。キリよく割る単位を小さくしてください');
+      return;
+    }
+
+    final ranks = <Map<String, dynamic>>[];
+    final winnerIndex = result.winnerIndex;
+    final externalWinner = winnerIndex == null
+        ? <({int index, int amount})>[]
+        : external.where((payment) => payment.index == winnerIndex).toList();
+    final regular = winnerIndex == null
+        ? external
+        : external.where((payment) => payment.index != winnerIndex).toList();
+    if (externalWinner.isNotEmpty) {
+      final name = submission.names[externalWinner.first.index].trim();
+      final shortName = name.length > 20 ? name.substring(0, 20) : name;
+      ranks.add({
+        'label': '端数担当：$shortName',
+        'amount': externalWinner.first.amount.toString(),
+        'capacity': 1,
+      });
+    }
+    if (regular.isNotEmpty) {
+      ranks.add({
+        'label': winnerIndex == null ? '全員同額' : '基本金額',
+        'amount': regular.first.amount.toString(),
+        'capacity': regular.length,
+      });
+    }
+
+    final title = _titleController.text.trim();
+    await _persistRankedBill(
+      title: title.isEmpty ? _defaultTitle : title,
+      ranks: ranks,
+    );
+  }
+
+  Future<void> _persistRankedBill({
+    required String title,
+    required List<Map<String, dynamic>> ranks,
+  }) async {
     setState(() => _isCreating = true);
     try {
       final bill = await ApiClient.instance.createRankedSplitBill(
-        title: title.isEmpty ? _defaultTitle : title,
+        title: title,
         currency: _currency,
         ranks: ranks,
       );
@@ -283,7 +361,9 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('割り勘')),
+      appBar: AppBar(
+        title: const AppBarTitle(icon: Icons.call_split, title: '割り勘'),
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -315,6 +395,11 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                       suffixText: '円',
                       border: OutlineInputBorder(),
                     ),
+                    onChanged: (_) {
+                      if (_useRemainderRoulette) {
+                        setState(() => _useRemainderRoulette = false);
+                      }
+                    },
                     validator: (value) {
                       final amount = int.tryParse(value?.trim() ?? '');
                       if (amount == null || amount <= 0) {
@@ -341,7 +426,10 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                     ],
                     selected: {_mode},
                     onSelectionChanged: (selection) {
-                      setState(() => _mode = selection.first);
+                      setState(() {
+                        _mode = selection.first;
+                        _useRemainderRoulette = false;
+                      });
                     },
                   ),
                   const SizedBox(height: 16),
@@ -358,6 +446,11 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                         helperText: '自分を含めた人数。端数は切り上げます',
                         border: OutlineInputBorder(),
                       ),
+                      onChanged: (_) {
+                        if (_useRemainderRoulette) {
+                          setState(() => _useRemainderRoulette = false);
+                        }
+                      },
                       validator: (value) {
                         // 傾斜のときはこの欄を使わないので検証しない
                         if (_mode != _SplitMode.even) return null;
@@ -371,7 +464,36 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                         return null;
                       },
                     ),
-                  ] else
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _amountController,
+                      builder: (context, amountValue, _) =>
+                          ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _countController,
+                        builder: (context, countValue, _) {
+                          final amount = int.tryParse(amountValue.text.trim());
+                          final count = int.tryParse(countValue.text.trim());
+                          if (count == null ||
+                              count < 2 ||
+                              count > _maxParticipants) {
+                            return const SizedBox.shrink();
+                          }
+                          return RemainderRouletteEditor(
+                            currency: _currency,
+                            totalAmount: amount,
+                            participantCount: count,
+                            rouletteActive: _useRemainderRoulette,
+                            isCreating: _isCreating,
+                            onCreate: _createRemainderRoulette,
+                            onRouletteActiveChanged: (active) {
+                              if (mounted && _useRemainderRoulette != active) {
+                                setState(() => _useRemainderRoulette = active);
+                              }
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ] else if (_mode == _SplitMode.weighted)
                     ValueListenableBuilder<TextEditingValue>(
                       valueListenable: _amountController,
                       builder: (context, amountValue, _) {
@@ -385,18 +507,25 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                                   ValueListenableBuilder<int?>(
                                 valueListenable: _organizerGroupNotifier,
                                 builder: (context, organizerIndex, _) =>
-                                    WeightedSplitEditor(
-                                  currency: _currency,
-                                  totalAmount: amount,
-                                  groups: groups,
-                                  onChanged: (value) =>
-                                      _groupsNotifier.value = value,
-                                  unit: unit,
-                                  onUnitChanged: (value) =>
-                                      _unitNotifier.value = value,
-                                  organizerGroupIndex: organizerIndex,
-                                  onOrganizerGroupChanged: (value) =>
-                                      _organizerGroupNotifier.value = value,
+                                    ValueListenableBuilder<Set<int>>(
+                                  valueListenable: _lockedGroupsNotifier,
+                                  builder: (context, lockedGroups, _) =>
+                                      WeightedSplitEditor(
+                                    currency: _currency,
+                                    totalAmount: amount,
+                                    groups: groups,
+                                    onChanged: (value) =>
+                                        _groupsNotifier.value = value,
+                                    unit: unit,
+                                    onUnitChanged: (value) =>
+                                        _unitNotifier.value = value,
+                                    organizerGroupIndex: organizerIndex,
+                                    onOrganizerGroupChanged: (value) =>
+                                        _organizerGroupNotifier.value = value,
+                                    lockedGroupIndices: lockedGroups,
+                                    onLockedGroupIndicesChanged: (value) =>
+                                        _lockedGroupsNotifier.value = value,
+                                  ),
                                 ),
                               ),
                             );
@@ -404,23 +533,27 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                         );
                       },
                     ),
-                  const SizedBox(height: 24),
-                  FilledButton.icon(
-                    onPressed: _isCreating ? null : _create,
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                  if (!_useRemainderRoulette) ...[
+                    const SizedBox(height: 24),
+                    FilledButton.icon(
+                      onPressed: _isCreating ? null : _create,
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      icon: _isCreating
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.call_split),
+                      label: Text(
+                        _mode == _SplitMode.weighted
+                            ? '傾斜つき割り勘リンクを作成'
+                            : '割り勘を作成',
+                      ),
                     ),
-                    icon: _isCreating
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.call_split),
-                    label: Text(
-                      _mode == _SplitMode.weighted ? '傾斜つき割り勘リンクを作成' : '割り勘を作成',
-                    ),
-                  ),
+                  ],
                 ],
               ),
             ),
