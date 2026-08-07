@@ -6,6 +6,7 @@ import '../services/api_client.dart';
 import '../utils/money.dart';
 import '../utils/browser_url.dart';
 import '../utils/weighted_split.dart';
+import '../widgets/remainder_roulette_editor.dart';
 import '../widgets/weighted_split_editor.dart';
 import 'split_bill_detail_screen.dart';
 import '../utils/input_formatters.dart';
@@ -38,6 +39,7 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
   final _countController = TextEditingController();
 
   bool _isCreating = false;
+  bool _useRemainderRoulette = false;
 
   /// 分け方。既定は等分で、必要なときだけ傾斜に切り替える。
   _SplitMode _mode = _SplitMode.even;
@@ -268,10 +270,72 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
       }
     }
 
+    await _persistRankedBill(
+      title: title.isEmpty ? _defaultTitle : title,
+      ranks: ranks,
+    );
+  }
+
+  /// 個人名は作成確定前の表示に使い、既存APIには金額別の枠として保存する。
+  Future<void> _createRemainderRoulette(
+    RemainderRouletteSubmission submission,
+  ) async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    final result = submission.result;
+    final external = [
+      for (var index = 0; index < result.payments.length; index++)
+        if (index != submission.organizerIndex)
+          (index: index, amount: result.payments[index]),
+    ];
+    if (external.isEmpty) {
+      _showError('請求する相手が1人以上必要です');
+      return;
+    }
+    if (external.any((payment) => payment.amount <= 0)) {
+      _showError('0円の参加者がいます。キリよく割る単位を小さくしてください');
+      return;
+    }
+
+    final ranks = <Map<String, dynamic>>[];
+    final winnerIndex = result.winnerIndex;
+    final externalWinner = winnerIndex == null
+        ? <({int index, int amount})>[]
+        : external.where((payment) => payment.index == winnerIndex).toList();
+    final regular = winnerIndex == null
+        ? external
+        : external.where((payment) => payment.index != winnerIndex).toList();
+    if (externalWinner.isNotEmpty) {
+      final name = submission.names[externalWinner.first.index].trim();
+      final shortName = name.length > 20 ? name.substring(0, 20) : name;
+      ranks.add({
+        'label': '端数担当：$shortName',
+        'amount': externalWinner.first.amount.toString(),
+        'capacity': 1,
+      });
+    }
+    if (regular.isNotEmpty) {
+      ranks.add({
+        'label': winnerIndex == null ? '全員同額' : '基本金額',
+        'amount': regular.first.amount.toString(),
+        'capacity': regular.length,
+      });
+    }
+
+    final title = _titleController.text.trim();
+    await _persistRankedBill(
+      title: title.isEmpty ? _defaultTitle : title,
+      ranks: ranks,
+    );
+  }
+
+  Future<void> _persistRankedBill({
+    required String title,
+    required List<Map<String, dynamic>> ranks,
+  }) async {
     setState(() => _isCreating = true);
     try {
       final bill = await ApiClient.instance.createRankedSplitBill(
-        title: title.isEmpty ? _defaultTitle : title,
+        title: title,
         currency: _currency,
         ranks: ranks,
       );
@@ -328,6 +392,11 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                       suffixText: '円',
                       border: OutlineInputBorder(),
                     ),
+                    onChanged: (_) {
+                      if (_useRemainderRoulette) {
+                        setState(() => _useRemainderRoulette = false);
+                      }
+                    },
                     validator: (value) {
                       final amount = int.tryParse(value?.trim() ?? '');
                       if (amount == null || amount <= 0) {
@@ -354,7 +423,10 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                     ],
                     selected: {_mode},
                     onSelectionChanged: (selection) {
-                      setState(() => _mode = selection.first);
+                      setState(() {
+                        _mode = selection.first;
+                        _useRemainderRoulette = false;
+                      });
                     },
                   ),
                   const SizedBox(height: 16),
@@ -371,6 +443,11 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                         helperText: '自分を含めた人数。端数は切り上げます',
                         border: OutlineInputBorder(),
                       ),
+                      onChanged: (_) {
+                        if (_useRemainderRoulette) {
+                          setState(() => _useRemainderRoulette = false);
+                        }
+                      },
                       validator: (value) {
                         // 傾斜のときはこの欄を使わないので検証しない
                         if (_mode != _SplitMode.even) return null;
@@ -384,7 +461,36 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                         return null;
                       },
                     ),
-                  ] else
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _amountController,
+                      builder: (context, amountValue, _) =>
+                          ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _countController,
+                        builder: (context, countValue, _) {
+                          final amount = int.tryParse(amountValue.text.trim());
+                          final count = int.tryParse(countValue.text.trim());
+                          if (count == null ||
+                              count < 2 ||
+                              count > _maxParticipants) {
+                            return const SizedBox.shrink();
+                          }
+                          return RemainderRouletteEditor(
+                            currency: _currency,
+                            totalAmount: amount,
+                            participantCount: count,
+                            rouletteActive: _useRemainderRoulette,
+                            isCreating: _isCreating,
+                            onCreate: _createRemainderRoulette,
+                            onRouletteActiveChanged: (active) {
+                              if (mounted && _useRemainderRoulette != active) {
+                                setState(() => _useRemainderRoulette = active);
+                              }
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ] else if (_mode == _SplitMode.weighted)
                     ValueListenableBuilder<TextEditingValue>(
                       valueListenable: _amountController,
                       builder: (context, amountValue, _) {
@@ -424,23 +530,27 @@ class _SplitBillCreateScreenState extends State<SplitBillCreateScreen> {
                         );
                       },
                     ),
-                  const SizedBox(height: 24),
-                  FilledButton.icon(
-                    onPressed: _isCreating ? null : _create,
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                  if (!_useRemainderRoulette) ...[
+                    const SizedBox(height: 24),
+                    FilledButton.icon(
+                      onPressed: _isCreating ? null : _create,
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      icon: _isCreating
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.call_split),
+                      label: Text(
+                        _mode == _SplitMode.weighted
+                            ? '傾斜つき割り勘リンクを作成'
+                            : '割り勘を作成',
+                      ),
                     ),
-                    icon: _isCreating
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.call_split),
-                    label: Text(
-                      _mode == _SplitMode.weighted ? '傾斜つき割り勘リンクを作成' : '割り勘を作成',
-                    ),
-                  ),
+                  ],
                 ],
               ),
             ),
