@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/split_bill.dart';
 import '../services/api_client.dart';
 import '../utils/money.dart';
+import '../widgets/app_bar_title.dart';
 import 'split_bill_detail_screen.dart';
 import '../utils/input_formatters.dart';
 
@@ -147,7 +148,9 @@ class _JoinSplitBillScreenState extends State<JoinSplitBillScreen> {
   Widget build(BuildContext context) {
     final bill = _bill;
     return Scaffold(
-      appBar: AppBar(title: const Text('割り勘に参加')),
+      appBar: AppBar(
+        title: const AppBarTitle(icon: Icons.group_add, title: '割り勘に参加'),
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),

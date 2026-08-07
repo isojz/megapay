@@ -6,6 +6,7 @@ import '../models/payment_request.dart';
 import '../services/api_client.dart';
 import '../theme.dart';
 import '../utils/money.dart';
+import '../widgets/app_bar_title.dart';
 import '../widgets/saved_user_picker.dart';
 import '../utils/input_formatters.dart';
 
@@ -228,7 +229,7 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('請求'),
+        title: const AppBarTitle(icon: Icons.receipt_long, title: '請求'),
       ),
       body: Center(
         child: SingleChildScrollView(

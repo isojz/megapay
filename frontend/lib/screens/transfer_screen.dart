@@ -4,6 +4,7 @@ import '../models/models.dart';
 import '../services/api_client.dart';
 import '../theme.dart';
 import '../utils/money.dart';
+import '../widgets/app_bar_title.dart';
 import '../widgets/saved_user_picker.dart';
 import '../utils/input_formatters.dart';
 
@@ -208,7 +209,9 @@ class _TransferScreenState extends State<TransferScreen> {
   Widget build(BuildContext context) {
     final selectedBalance = _selectedBalance;
     return Scaffold(
-      appBar: AppBar(title: const Text('送金')),
+      appBar: AppBar(
+        title: const AppBarTitle(icon: Icons.send_outlined, title: '送金'),
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),

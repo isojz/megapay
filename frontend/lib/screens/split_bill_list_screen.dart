@@ -4,6 +4,7 @@ import '../models/split_bill.dart';
 import '../services/api_client.dart';
 import '../theme.dart';
 import '../utils/money.dart';
+import '../widgets/app_bar_title.dart';
 import 'split_bill_detail_screen.dart';
 
 /// 割り勘一覧：自分が集金する分と、参加している分をまとめて表示する。
@@ -137,7 +138,7 @@ class _SplitBillListScreenState extends State<SplitBillListScreen>
     final selectedIndex = _tabController.index;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('割り勘一覧'),
+        title: const AppBarTitle(icon: Icons.groups, title: '割り勘一覧'),
         // タブは赤いヘッダーの上ではなく、一覧のカードと同じ明るい面に載せる。
         // 赤地に白文字だと選択中と未選択が見分けにくいため。
         bottom: PreferredSize(

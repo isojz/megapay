@@ -5,6 +5,7 @@ import '../services/api_client.dart';
 import '../utils/browser_url.dart';
 import '../utils/money.dart';
 import '../widgets/payment_method_selector.dart';
+import '../widgets/app_bar_title.dart';
 import 'home_screen.dart';
 
 /// 割り勘の支払い画面。支払い方法によって残高の動きが変わる。
@@ -98,8 +99,7 @@ class _SplitBillPaymentMockScreenState
             const SizedBox(height: 12),
             Text(
               switch (method) {
-                PaymentMethod.cash =>
-                  '現金で渡した記録だけを残します。アプリ内の残高は動きません。',
+                PaymentMethod.cash => '現金で渡した記録だけを残します。アプリ内の残高は動きません。',
                 PaymentMethod.balance => '支払うと残高から送金が実行されます。取り消せません。',
                 _ => '${method.label}で引き落とされます。'
                     'MegaPay残高は減りません。取り消せません。',
@@ -173,7 +173,10 @@ class _SplitBillPaymentMockScreenState
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('割り勘の支払い'),
+        title: const AppBarTitle(
+          icon: Icons.payments_outlined,
+          title: '割り勘の支払い',
+        ),
         leading: widget.openedFromSharedLink && _isPaid
             ? IconButton(
                 tooltip: 'ホーム画面へ',
@@ -279,8 +282,7 @@ class _SplitBillPaymentMockScreenState
                       const SizedBox(height: 8),
                       Text(
                         switch (_selectedMethod) {
-                          PaymentMethod.cash =>
-                            '現金払いは残高を動かさず、支払い済みの記録だけを残します。',
+                          PaymentMethod.cash => '現金払いは残高を動かさず、支払い済みの記録だけを残します。',
                           PaymentMethod.balance => 'MegaPay残高から集金者へ送金されます。',
                           _ => '${_selectedMethod.label}で引き落とされ、集金者へ入金されます。'
                               'MegaPay残高は減りません。',
