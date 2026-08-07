@@ -3,21 +3,31 @@
 library;
 
 class Profile {
-  const Profile({required this.userId, required this.displayName, required this.email});
+  const Profile({
+    required this.userId,
+    required this.displayName,
+    required this.email,
+    required this.avatarKey,
+  });
 
   final String userId;
   final String displayName;
   final String email;
+  final String avatarKey;
 
   factory Profile.fromJson(Map<String, dynamic> json) => Profile(
         userId: json['user_id'] as String,
         displayName: json['display_name'] as String? ?? '',
         email: json['email'] as String? ?? '',
+        avatarKey: json['avatar_key'] as String? ?? 'avatar_01',
       );
 }
 
 class Balance {
-  const Balance({required this.currency, required this.amount});
+  const Balance({
+    required this.currency,
+    required this.amount,
+  });
 
   final String currency;
   final String amount;
@@ -29,7 +39,10 @@ class Balance {
 }
 
 class RecipientInfo {
-  const RecipientInfo({required this.userId, required this.displayName});
+  const RecipientInfo({
+    required this.userId,
+    required this.displayName,
+  });
 
   final String userId;
   final String displayName;

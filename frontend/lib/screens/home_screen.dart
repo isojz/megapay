@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
 import '../services/api_client.dart';
 import '../theme.dart';
-import '../utils/money.dart';
 import '../utils/browser_url.dart';
+import '../widgets/balance_hero_card.dart';
 import '../widgets/payment_request_actions.dart';
 import '../widgets/transfer_tile.dart';
 import 'saved_users_screen.dart';
@@ -110,6 +109,106 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _selectAvatar(Profile profile) async {
+    const avatarKeys = [
+      'avatar_01',
+      'avatar_02',
+      'avatar_03',
+      'avatar_04',
+      'avatar_05',
+      'avatar_06',
+    ];
+
+    final selectedAvatar = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('プロフィールアイコンを選択'),
+          content: SizedBox(
+            width: 320,
+            child: GridView.builder(
+              shrinkWrap: true,
+              itemCount: avatarKeys.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
+              itemBuilder: (context, index) {
+                final avatarKey = avatarKeys[index];
+                final selected = avatarKey == profile.avatarKey;
+
+                return InkWell(
+                  onTap: () => Navigator.of(dialogContext).pop(avatarKey),
+                  borderRadius: BorderRadius.circular(999),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        width: selected ? 3 : 1,
+                        color: selected
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.outlineVariant,
+                      ),
+                    ),
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/avatars/$avatarKey.png',
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('キャンセル'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (selectedAvatar == null || selectedAvatar == profile.avatarKey) {
+  return;
+}
+
+try {
+  final updatedProfile =
+      await ApiClient.instance.updateAvatar(selectedAvatar);
+
+  if (!mounted) return;
+
+  setState(() {
+    _future = _future.then(
+      (data) => _HomeData(
+        updatedProfile,
+        data.balances,
+        data.transfers,
+      ),
+    );
+  });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('プロフィールアイコンを変更しました'),
+        ),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message),
+        ),
+      );
+    }
+  }
+
   Future<void> _signOut() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -194,18 +293,23 @@ class _HomeScreenState extends State<HomeScreen> {
                 constraints: const BoxConstraints(maxWidth: 560),
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
+                  // 下端の 96px はボトムバーを置く想定の名残で、実際には
+                  // 何も無く空白が伸びて見えていたため詰める。
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
                   children: [
-                    _ProfileCard(profile: data.profile),
+                    _ProfileGreeting(
+                      profile: data.profile,
+                      onAvatarTap: () => _selectAvatar(data.profile),
+                    ),
                     SizedBox(height: tightGap),
-                    Text('残高', style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 6),
-                    ...data.balances.map((b) => _BalanceTile(balance: b)),
-                    if (data.balances.isEmpty)
-                      const Card(
-                        child: ListTile(title: Text('残高がありません')),
-                      ),
-                    SizedBox(height: tightGap),
+                    // 残高はこの画面の主役。見出しやユーザーIDもカードに
+                    // 内包させ、開いた瞬間に「いくらあるか」が目に入るようにする。
+                    BalanceHeroCard(
+                      balance:
+                          data.balances.isEmpty ? null : data.balances.first,
+                      userId: data.profile.userId,
+                    ),
+                    SizedBox(height: gap),
                     PaymentRequestActions(
                       balances: data.balances,
                       onChanged: _reload,
@@ -247,120 +351,65 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _ProfileCard extends StatelessWidget {
-  const _ProfileCard({required this.profile});
+/// 画面上部の挨拶行。
+///
+/// 以前はここに大きな色付きのカードを置き、名前・メール・ユーザーIDを
+/// まとめて出していた。しかしプロフィールは毎回確認する情報ではないのに
+/// 画面で一番目立ってしまい、肝心の残高が埋もれていた。
+/// そのため表示は「アイコン＋名前」だけに絞り、ユーザーIDは残高カード側へ
+/// 移した。アイコンを押すと変更できる導線はそのまま残している。
+class _ProfileGreeting extends StatelessWidget {
+  const _ProfileGreeting({
+    required this.profile,
+    required this.onAvatarTap,
+  });
 
   final Profile profile;
-
-  Future<void> _copyUserId(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
-    await Clipboard.setData(ClipboardData(text: profile.userId));
-    messenger.showSnackBar(
-      const SnackBar(content: Text('ユーザーIDをコピーしました')),
-    );
-  }
+  final VoidCallback onAvatarTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      color: theme.colorScheme.primaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  child: Text(
-                    profile.displayName.isNotEmpty
-                        ? profile.displayName.characters.first
-                        : '?',
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${profile.displayName} さん',
-                        style: theme.textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
+    return Row(
+      children: [
+        Tooltip(
+          message: 'プロフィールアイコンを変更',
+          child: InkWell(
+            onTap: onAvatarTap,
+            borderRadius: BorderRadius.circular(999),
+            child: CircleAvatar(
+              radius: 22,
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/avatars/${profile.avatarKey}.png',
+                  width: 44,
+                  height: 44,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Center(
+                      child: Text(
+                        profile.displayName.isNotEmpty
+                            ? profile.displayName.characters.first
+                            : '?',
                       ),
-                      Text(profile.email, style: theme.textTheme.bodySmall),
-                    ],
-                  ),
+                    );
+                  },
                 ),
-              ],
+              ),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'ユーザーID: ${profile.userId}',
-                    // monospace は日本語グリフを持たないため、ラベル部分の
-                    // フォールバック先に同梱フォントを指定する
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontFamily: 'monospace',
-                      fontFamilyFallback: const ['NotoSansJP'],
-                    ),
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'ユーザーIDをコピー',
-                  icon: const Icon(Icons.copy, size: 18),
-                  onPressed: () => _copyUserId(context),
-                ),
-              ],
-            ),
-            Text(
-              'このIDを相手に伝えると送金を受け取れます',
-              style: theme.textTheme.bodySmall,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _BalanceTile extends StatefulWidget {
-  const _BalanceTile({required this.balance});
-
-  final Balance balance;
-
-  @override
-  State<_BalanceTile> createState() => _BalanceTileState();
-}
-
-class _BalanceTileState extends State<_BalanceTile> {
-  /// 人に見られないよう既定では伏せ、目のボタンで表示を切り替える。
-  bool _visible = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      child: ListTile(
-        // 金額は title に置いて左揃えにし、目のボタンを trailing（右）に置く
-        title: Text(
-          _visible ? formatYen(widget.balance.amount) : '•••••• 円',
-          style: theme.textTheme.headlineMedium
-              ?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        trailing: IconButton(
-          tooltip: _visible ? '残高を隠す' : '残高を表示',
-          icon: Icon(
-            _visible
-                ? Icons.visibility_off_outlined
-                : Icons.visibility_outlined,
           ),
-          onPressed: () => setState(() => _visible = !_visible),
         ),
-      ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            '${profile.displayName} さん',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleMedium,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -24,6 +24,9 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
+  assets:
+    - assets/avatars/
+
   # CanvasKit はブラウザのシステムフォントを使わず、未収録のグリフに出会うたび
   # fonts.gstatic.com から Noto を実行時ダウンロードする。取得が終わるまで
   # 日本語は豆腐（□）で描画され、CDN が遮断された環境では直らない。
