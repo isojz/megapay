@@ -301,16 +301,27 @@ ThemeData _buildTheme(Brightness brightness) {
         color: colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
       ),
     ),
-    // タブは赤地に白だと選択中と未選択の区別が付きにくい。
-    // カードと同じ明るい面に載せ、文字色で選択状態を示す。
+    // タブは細い下線だけだと、今どちらを見ているのかが分かりにくい。
+    // 選択中のタブを塗りつぶし、色・太さ・背景の3つで差を付ける。
+    //
+    // なお unselectedLabelStyle を省くと labelStyle がそのまま使われ、
+    // 未選択側まで太字になって差が色だけになる。必ず両方指定すること。
     tabBarTheme: TabBarThemeData(
-      labelColor: colorScheme.primary,
+      labelColor: colorScheme.onPrimary,
       unselectedLabelColor: colorScheme.onSurfaceVariant,
-      indicatorColor: colorScheme.primary,
+      indicatorSize: TabBarIndicatorSize.tab,
+      indicator: BoxDecoration(
+        color: colorScheme.primary,
+        borderRadius: BorderRadius.circular(megaPayControlRadius),
+      ),
       dividerColor: Colors.transparent,
       labelStyle: const TextStyle(
         fontFamily: 'NotoSansJP',
         fontWeight: FontWeight.w700,
+      ),
+      unselectedLabelStyle: const TextStyle(
+        fontFamily: 'NotoSansJP',
+        fontWeight: FontWeight.w500,
       ),
     ),
     // 通知は下から浮かせて角丸にし、他のカードと形をそろえる。
