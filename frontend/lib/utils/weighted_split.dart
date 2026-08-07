@@ -136,8 +136,7 @@ class SplitResult {
   }
 
   /// 単位が大きすぎて 1 人あたり 0 円になったグループがあるか
-  bool get hasZeroAmount =>
-      groups.any((result) => result.amountPerPerson <= 0);
+  bool get hasZeroAmount => groups.any((result) => result.amountPerPerson <= 0);
 }
 
 /// 割り振りの単位として選べる金額。

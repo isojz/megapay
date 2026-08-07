@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/models.dart';
+import '../services/mock_funding.dart';
 import '../utils/money.dart';
 
 class WithdrawScreen extends StatefulWidget {
@@ -47,10 +48,11 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
     });
   }
 
-  void _goNext() {
+  Future<void> _goNext() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    if (_selectedMethod == null) {
+    final method = _selectedMethod;
+    if (method == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('出金方法を選択してください'),
@@ -59,17 +61,38 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
       return;
     }
 
-    final amount = _amountController.text.trim();
+    final amount = int.parse(_amountController.text.trim());
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('出金内容の確認'),
+        content: Text(
+          '${formatMoney(_currency, amount.toString())} を$methodへ出金します。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('出金する'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    await MockFunding.withdraw(amount);
+    if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          '${formatMoney(_currency, amount)} を$_selectedMethodで出金します',
-        ),
+        content: Text('${formatMoney(_currency, amount.toString())} を出金しました'),
       ),
     );
-
-    // TODO: 選択した出金方法ごとの次画面へ遷移する
+    // ホーム画面へ戻って残高を更新する
+    Navigator.of(context).pop(true);
   }
 
   @override
@@ -173,7 +196,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                 FilledButton.icon(
                   onPressed: _goNext,
                   icon: const Icon(Icons.arrow_forward),
-                  label: const Text('次へ'),
+                  label: const Text('出金する'),
                 ),
               ],
             ),

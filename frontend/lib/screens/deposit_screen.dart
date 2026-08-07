@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/models.dart';
+import '../services/mock_funding.dart';
 import '../utils/money.dart';
 
 /// 入金画面：入金方法を選ぶところまで。出金画面と対になる構成。
@@ -48,10 +49,11 @@ class _DepositScreenState extends State<DepositScreen> {
     });
   }
 
-  void _goNext() {
+  Future<void> _goNext() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    if (_selectedMethod == null) {
+    final method = _selectedMethod;
+    if (method == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('入金方法を選択してください'),
@@ -60,17 +62,38 @@ class _DepositScreenState extends State<DepositScreen> {
       return;
     }
 
-    final amount = _amountController.text.trim();
+    final amount = int.parse(_amountController.text.trim());
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('入金内容の確認'),
+        content: Text(
+          '${formatMoney(_currency, amount.toString())} を$methodから入金します。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('入金する'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    await MockFunding.deposit(amount);
+    if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          '${formatMoney(_currency, amount)} を$_selectedMethodで入金します',
-        ),
+        content: Text('${formatMoney(_currency, amount.toString())} を入金しました'),
       ),
     );
-
-    // TODO: 選択した入金方法ごとの次画面へ遷移する
+    // ホーム画面へ戻って残高を更新する
+    Navigator.of(context).pop(true);
   }
 
   @override
@@ -169,7 +192,7 @@ class _DepositScreenState extends State<DepositScreen> {
                 FilledButton.icon(
                   onPressed: _goNext,
                   icon: const Icon(Icons.arrow_forward),
-                  label: const Text('次へ'),
+                  label: const Text('入金する'),
                 ),
               ],
             ),
