@@ -49,17 +49,18 @@ class TransferTile extends StatelessWidget {
               style: theme.textTheme.titleSmall
                   ?.copyWith(fontWeight: FontWeight.bold, color: color),
             ),
-            // 高さ 24px では指で押しづらく誤タップも起きるため、
-            // アイコンの見た目は変えずに当たり判定だけ広げる。
-            IconButton(
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(
-                minWidth: 40,
-                minHeight: 40,
+            // 高さ 24px では指で押しづらいので当たり判定を広げる。
+            // ただし ListTile は trailing の高さを 56px までに制限するため、
+            // 上の金額と合わせて収まる 32px にとどめ、幅で押しやすさを補う。
+            SizedBox(
+              height: 32,
+              width: 44,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                tooltip: 'ユーザーを保存',
+                onPressed: onSave,
+                icon: const Icon(Icons.bookmark_add_outlined, size: 20),
               ),
-              tooltip: 'ユーザーを保存',
-              onPressed: onSave,
-              icon: const Icon(Icons.bookmark_add_outlined, size: 20),
             ),
           ],
         ),
