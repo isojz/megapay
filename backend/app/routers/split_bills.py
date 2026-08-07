@@ -161,3 +161,19 @@ def list_split_bill_participants(
     except APIError as err:
         raise to_http_exception(err) from err
     return [SplitBillParticipant(**item) for item in data]
+
+
+@router.delete("/{bill_code}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_split_bill(
+    bill_code: str,
+    user: AuthUser = Depends(get_current_user),
+) -> None:
+    """作成した割り勘を取り消す（集金者のみ）。
+
+    まだ誰も支払っていない場合に限る。参加者あての請求も一緒に取り消される。
+    すでに支払った人がいる場合は 409 を返す。
+    """
+    try:
+        db.delete_split_bill(user.token, bill_code.strip())
+    except APIError as err:
+        raise to_http_exception(err) from err
