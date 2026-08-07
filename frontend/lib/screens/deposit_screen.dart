@@ -5,8 +5,9 @@ import '../models/models.dart';
 import '../services/mock_funding.dart';
 import '../utils/money.dart';
 
-class WithdrawScreen extends StatefulWidget {
-  const WithdrawScreen({
+/// 入金画面：入金方法を選ぶところまで。出金画面と対になる構成。
+class DepositScreen extends StatefulWidget {
+  const DepositScreen({
     super.key,
     required this.balances,
   });
@@ -14,11 +15,11 @@ class WithdrawScreen extends StatefulWidget {
   final List<Balance> balances;
 
   @override
-  State<WithdrawScreen> createState() => _WithdrawScreenState();
+  State<DepositScreen> createState() => _DepositScreenState();
 }
 
-class _WithdrawScreenState extends State<WithdrawScreen> {
-  /// 現在は日本円のみ出金できる。
+class _DepositScreenState extends State<DepositScreen> {
+  /// 現在は日本円のみ入金できる。
   static const _currency = 'JPY';
 
   final _formKey = GlobalKey<FormState>();
@@ -55,7 +56,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
     if (method == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('出金方法を選択してください'),
+          content: Text('入金方法を選択してください'),
         ),
       );
       return;
@@ -65,9 +66,9 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('出金内容の確認'),
+        title: const Text('入金内容の確認'),
         content: Text(
-          '${formatMoney(_currency, amount.toString())} を$methodへ出金します。',
+          '${formatMoney(_currency, amount.toString())} を$methodから入金します。',
         ),
         actions: [
           TextButton(
@@ -76,19 +77,19 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('出金する'),
+            child: const Text('入金する'),
           ),
         ],
       ),
     );
     if (confirmed != true || !mounted) return;
 
-    await MockFunding.withdraw(amount);
+    await MockFunding.deposit(amount);
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${formatMoney(_currency, amount.toString())} を出金しました'),
+        content: Text('${formatMoney(_currency, amount.toString())} を入金しました'),
       ),
     );
     // ホーム画面へ戻って残高を更新する
@@ -101,7 +102,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('出金'),
+        title: const Text('入金'),
       ),
       body: Center(
         child: ConstrainedBox(
@@ -118,7 +119,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '現在の残高',
+                          '現在の残高（日本円）',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                         const SizedBox(height: 8),
@@ -140,7 +141,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  '出金額',
+                  '入金額',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
@@ -158,45 +159,40 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                     if (amount == null || amount <= 0) {
                       return '正しい金額を入力してください';
                     }
-                    final balance = _selectedBalance;
-                    if (balance != null &&
-                        (double.tryParse(balance.amount) ?? 0) < amount) {
-                      return '残高が不足しています';
-                    }
                     return null;
                   },
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  '出金方法',
+                  '入金方法',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 12),
-                _WithdrawMethodButton(
+                _DepositMethodButton(
                   icon: Icons.account_balance_outlined,
                   label: '指定口座',
                   selected: _selectedMethod == '指定口座',
                   onPressed: () => _selectMethod('指定口座'),
                 ),
                 const SizedBox(height: 12),
-                _WithdrawMethodButton(
+                _DepositMethodButton(
                   icon: Icons.account_balance_wallet_outlined,
                   label: 'PayPay',
                   selected: _selectedMethod == 'PayPay',
                   onPressed: () => _selectMethod('PayPay'),
                 ),
                 const SizedBox(height: 12),
-                _WithdrawMethodButton(
-                  icon: Icons.stars_outlined,
-                  label: 'ポイントに変換',
-                  selected: _selectedMethod == 'ポイントに変換',
-                  onPressed: () => _selectMethod('ポイントに変換'),
+                _DepositMethodButton(
+                  icon: Icons.credit_card,
+                  label: 'クレジットカード',
+                  selected: _selectedMethod == 'クレジットカード',
+                  onPressed: () => _selectMethod('クレジットカード'),
                 ),
                 const SizedBox(height: 24),
                 FilledButton.icon(
                   onPressed: _goNext,
                   icon: const Icon(Icons.arrow_forward),
-                  label: const Text('出金する'),
+                  label: const Text('入金する'),
                 ),
               ],
             ),
@@ -207,8 +203,8 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
   }
 }
 
-class _WithdrawMethodButton extends StatelessWidget {
-  const _WithdrawMethodButton({
+class _DepositMethodButton extends StatelessWidget {
+  const _DepositMethodButton({
     required this.icon,
     required this.label,
     required this.selected,

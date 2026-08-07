@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
 import '../services/api_client.dart';
+import '../services/mock_funding.dart';
 import '../theme.dart';
 import '../utils/browser_url.dart';
 import '../widgets/balance_hero_card.dart';
@@ -55,9 +56,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final balances = (results[1] as List<Balance>)
         .where((b) => b.currency == _supportedCurrency)
         .toList();
+    // 入金・出金はモックのため、増減分を端末側で上乗せして表示する
+    final offset = await MockFunding.offset();
     return _HomeData(
       results[0] as Profile,
-      balances,
+      MockFunding.apply(balances, offset, _supportedCurrency),
       results[2] as List<TransferRecord>,
     );
   }
@@ -174,24 +177,24 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (selectedAvatar == null || selectedAvatar == profile.avatarKey) {
-  return;
-}
+      return;
+    }
 
-try {
-  final updatedProfile =
-      await ApiClient.instance.updateAvatar(selectedAvatar);
+    try {
+      final updatedProfile =
+          await ApiClient.instance.updateAvatar(selectedAvatar);
 
-  if (!mounted) return;
+      if (!mounted) return;
 
-  setState(() {
-    _future = _future.then(
-      (data) => _HomeData(
-        updatedProfile,
-        data.balances,
-        data.transfers,
-      ),
-    );
-  });
+      setState(() {
+        _future = _future.then(
+          (data) => _HomeData(
+            updatedProfile,
+            data.balances,
+            data.transfers,
+          ),
+        );
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
