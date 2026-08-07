@@ -35,11 +35,11 @@ class RouletteWheel extends StatelessWidget {
                   names: names,
                   rotation: rotation,
                   winnerIndex: winnerIndex,
-                  colors: _wheelColors(scheme),
+                  colors: _wheelColors,
                   borderColor: scheme.surface,
                   textColor: scheme.onPrimaryContainer,
-                  winnerColor: scheme.primary,
-                  winnerTextColor: scheme.onPrimary,
+                  winnerColor: _rouletteWinnerColor,
+                  winnerTextColor: _rouletteWinnerTextColor,
                 ),
               ),
             ),
@@ -49,12 +49,11 @@ class RouletteWheel extends StatelessWidget {
               decoration: BoxDecoration(
                 color: scheme.surface,
                 shape: BoxShape.circle,
-                border: Border.all(color: scheme.primary, width: 4),
+                border: Border.all(color: _rouletteAccentColor, width: 4),
                 boxShadow: const [
                   BoxShadow(color: Color(0x24000000), blurRadius: 10),
                 ],
               ),
-              child: Icon(Icons.currency_yen, color: scheme.primary),
             ),
             Positioned(
               top: -10,
@@ -64,7 +63,7 @@ class RouletteWheel extends StatelessWidget {
                 child: CustomPaint(
                   size: const Size(34, 38),
                   painter: _PointerPainter(
-                    color: scheme.primary,
+                    color: _rouletteAccentColor,
                     borderColor: scheme.surface,
                   ),
                 ),
@@ -77,14 +76,21 @@ class RouletteWheel extends StatelessWidget {
   }
 }
 
-List<Color> _wheelColors(ColorScheme scheme) => [
-  scheme.primaryContainer,
-  scheme.secondaryContainer,
-  scheme.tertiaryContainer,
-  scheme.surfaceContainerHighest,
-  Color.lerp(scheme.primaryContainer, scheme.surface, 0.35)!,
-  Color.lerp(scheme.secondaryContainer, scheme.surface, 0.3)!,
+const List<Color> _wheelColors = [
+  Color(0xFFFF3D71),
+  Color(0xFFFF6D00),
+  Color(0xFFFFC400),
+  Color(0xFF00C853),
+  Color(0xFF00B8D4),
+  Color(0xFF2979FF),
+  Color(0xFF651FFF),
+  Color(0xFFD500F9),
 ];
+
+// MegaPayのブランドカラーとは分けた、ルーレット専用の配色。
+const _rouletteAccentColor = Color(0xFF263238);
+const _rouletteWinnerColor = Color(0xFFFFD600);
+const _rouletteWinnerTextColor = Color(0xFF201A00);
 
 class _RouletteWheelPainter extends CustomPainter {
   _RouletteWheelPainter({

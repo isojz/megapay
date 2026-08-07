@@ -61,9 +61,7 @@ class _RemainderRouletteEditorState extends State<RemainderRouletteEditor>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final RemainderWinnerSelector _winnerSelector;
-  late final AudioPlayer _startPlayer;
-  late final AudioPlayer _tickPlayer;
-  late final AudioPlayer _winnerPlayer;
+  late final AudioPlayer _roulettePlayer;
   late List<String> _names;
   var _unit = 500;
   var _soundEnabled = true;
@@ -94,9 +92,7 @@ class _RemainderRouletteEditorState extends State<RemainderRouletteEditor>
     super.initState();
     _names = _defaultNames(_participantCount);
     _winnerSelector = widget.winnerSelector ?? RemainderWinnerSelector();
-    _startPlayer = AudioPlayer();
-    _tickPlayer = AudioPlayer();
-    _winnerPlayer = AudioPlayer();
+    _roulettePlayer = AudioPlayer();
     _controller = AnimationController(
       vsync: this,
       duration: widget.animationDuration,
@@ -130,9 +126,7 @@ class _RemainderRouletteEditorState extends State<RemainderRouletteEditor>
       ..removeListener(_onAnimationTick)
       ..removeStatusListener(_onAnimationStatus)
       ..dispose();
-    unawaited(_startPlayer.dispose());
-    unawaited(_tickPlayer.dispose());
-    unawaited(_winnerPlayer.dispose());
+    unawaited(_roulettePlayer.dispose());
     super.dispose();
   }
 
@@ -146,12 +140,7 @@ class _RemainderRouletteEditorState extends State<RemainderRouletteEditor>
       rotation: _rotation,
       participantCount: _participantCount,
     );
-    if (_lastPointerIndex != pointerIndex) {
-      _lastPointerIndex = pointerIndex;
-      if (_soundEnabled && _controller.value > 0.05) {
-        unawaited(_playSound(_tickPlayer, 'sounds/tick_001.ogg', volume: 0.3));
-      }
-    }
+    if (_lastPointerIndex != pointerIndex) _lastPointerIndex = pointerIndex;
     if (mounted) setState(() {});
   }
 
@@ -169,15 +158,7 @@ class _RemainderRouletteEditorState extends State<RemainderRouletteEditor>
       _winnerIndex = winner;
       _result = applyRemainderWinner(preview: preview, winnerIndex: winner);
     });
-    if (_soundEnabled) {
-      unawaited(
-        _playSound(
-          _winnerPlayer,
-          'sounds/confirmation_001.ogg',
-          volume: 0.7,
-        ),
-      );
-    }
+    if (_soundEnabled) unawaited(_roulettePlayer.stop());
   }
 
   void _clearResult() {
@@ -228,7 +209,22 @@ class _RemainderRouletteEditorState extends State<RemainderRouletteEditor>
       _lastPointerIndex = null;
     });
     if (_soundEnabled) {
-      await _playSound(_startPlayer, 'sounds/click_001.ogg', volume: 0.55);
+      try {
+        await _playSound(
+          _roulettePlayer,
+          'sounds/roulette/rouletteSound.wav',
+          volume: 0.7,
+        );
+      } catch (_) {
+        if (mounted) {
+          setState(() => _soundEnabled = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('ルーレット音を再生できませんでした。音なしで続行します'),
+            ),
+          );
+        }
+      }
     }
     await _controller.forward(from: 0);
   }
@@ -368,6 +364,7 @@ class _RemainderRouletteEditorState extends State<RemainderRouletteEditor>
           ExpansionTile(
             key: const Key('roulette-participant-names'),
             tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+            childrenPadding: const EdgeInsets.only(top: 16),
             title: const Text('参加者名'),
             subtitle: Text('集金者を含む$_participantCount人'),
             children: [
@@ -381,7 +378,7 @@ class _RemainderRouletteEditorState extends State<RemainderRouletteEditor>
                     readOnly: index == 0,
                     maxLength: 30,
                     decoration: InputDecoration(
-                      labelText: index == 0 ? '集金者' : '参加者${index + 1}',
+                      labelText: index == 0 ? '集金者' : '参加者$index',
                       counterText: '',
                     ),
                     onChanged: (value) => _changeName(index, value),
@@ -465,7 +462,7 @@ class _RemainderRouletteEditorState extends State<RemainderRouletteEditor>
 
 List<String> _defaultNames(int count) => [
       'あなた',
-      for (var index = 1; index < count; index++) '参加者${index + 1}',
+      for (var index = 1; index < count; index++) '参加者$index',
     ];
 
 class _PreviewCard extends StatelessWidget {
@@ -532,6 +529,7 @@ class _ResultCard extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final winner = result.winnerIndex!;
+    final winnerName = winner == 0 ? 'あなた（${names[winner]}）' : names[winner];
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -546,7 +544,7 @@ class _ResultCard extends StatelessWidget {
               style: theme.textTheme.titleMedium,
             ),
             Text(
-              names[winner],
+              winnerName,
               key: const Key('roulette-winner-name'),
               textAlign: TextAlign.center,
               style: theme.textTheme.headlineMedium?.copyWith(

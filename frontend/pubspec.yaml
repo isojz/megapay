@@ -28,6 +28,7 @@ flutter:
   assets:
     - assets/avatars/
     - assets/sounds/
+    - assets/sounds/roulette/rouletteSound.wav
 
   # CanvasKit はブラウザのシステムフォントを使わず、未収録のグリフに出会うたび
   # fonts.gstatic.com から Noto を実行時ダウンロードする。取得が終わるまで
