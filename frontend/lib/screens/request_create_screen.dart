@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../models/models.dart';
 import '../models/payment_request.dart';
 import '../services/api_client.dart';
+import '../theme.dart';
 import '../utils/money.dart';
 import '../widgets/saved_user_picker.dart';
 import '../utils/input_formatters.dart';
@@ -304,11 +305,11 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
                   ),
                   if (_verifiedPayer != null)
                     Card(
-                      color: Colors.green.shade50,
+                      color: MegaPaySemantics.of(context).successContainer,
                       child: ListTile(
-                        leading: const Icon(
+                        leading: Icon(
                           Icons.check_circle,
-                          color: Colors.green,
+                          color: MegaPaySemantics.of(context).success,
                         ),
                         title: Text(
                           '${_verifiedPayer!.displayName} さん',
@@ -324,17 +325,17 @@ class _RequestCreateScreenState extends State<RequestCreateScreen> {
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _amountController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    inputFormatters: decimalAmountInputFormatters,
+                    // 日本円は小数を扱わない。整数キーボード＋整数フォーマッタにして、
+                    // 表示（例: 101 円）と送信値（100.5）がずれるのを防ぐ。
+                    keyboardType: TextInputType.number,
+                    inputFormatters: integerAmountInputFormatters,
                     decoration: const InputDecoration(
                       labelText: '請求金額',
                       suffixText: '円',
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
-                      final amount = double.tryParse(
+                      final amount = int.tryParse(
                         value?.trim() ?? '',
                       );
 
